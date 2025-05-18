@@ -1,93 +1,91 @@
 # Aran's Game Tools for Blender
 
-**Aran's Game Tools** is a Blender add-on designed to streamline common game asset preparation tasks, especially for Unreal Engine workflows. It provides tools for mesh renaming, vertex color ID map generation, lightmap UV creation, and more—all accessible from the Blender UI.
+Welcome to **Aran's Game Tools**! This Blender add-on is a collection of little helpers for anyone prepping assets for Unreal Engine or just wanting to speed up some repetitive Blender tasks. It's not perfect, but it gets the job done and saves you some clicks.
 
 ---
 
-## Features
+## What It Does
 
 - **Loose Parts to Vertex Colors:**  
-  Assigns unique vertex colors to each disconnected mesh island (loose part) for easy ID map creation.
+  Quickly color each floating mesh island (loose part) with a unique vertex color. Great for making ID maps.
 
 - **Bake Vertex Colors to Texture:**  
-  Bake your vertex color ID map to a texture for export to game engines.
+  Take those vertex colors and bake them down to a texture you can export.
 
-- **Create Vertex Groups from Loose Parts:**  
-  Optionally create a vertex group for each loose part.
+- **Vertex Groups from Loose Parts:**  
+  Optionally, make a vertex group for each loose part (if you want to select them later).
 
-- **Lightmap UV Generation:**  
-  Automatically create and unwrap a second UV channel for lightmapping, compatible with Unreal Engine.
+- **Lightmap UVs:**  
+  One-click creation of a second UV channel for lightmaps, ready for Unreal.
 
-- **Custom Prefix/Suffix Tools:**  
-  Easily set naming conventions for static meshes, VFX meshes, and LODs.
-
-- **Export Path Management:**  
-  Set and manage export directories for Unreal Engine assets.
+- **Naming and Export Helpers:**  
+  Set up prefixes, suffixes, and export paths for Unreal Engine assets.
 
 ---
 
-## Installation
+## How to Install
 
-1. Download or clone this repository.
+1. Download or clone this repo.
 2. In Blender, go to **Edit > Preferences > Add-ons > Install**.
-3. Select the `.zip` or the folder containing this add-on.
+3. Pick the `.zip` or the folder with this add-on.
 4. Enable **Aran's Game Tools** in the add-ons list.
 
 ---
 
-## Usage
+## How to Use
 
-All tools are available in the **3D Viewport > Sidebar (N) > Game Tools** tab.
+Everything shows up in the **3D Viewport > Sidebar (N) > Game Tools** tab.
 
 ### Vertex Color ID Map
 
 1. Select your mesh.
-2. In the **Game Tools** panel, click **Loose Parts to Vertex Colors**.
-   - Optionally, enable "Create Vertex Groups from Loose Parts" to generate vertex groups.
-3. To bake the vertex colors to a texture, click **Bake Vertex Colors to Image**.
+2. In the panel, click **Loose Parts to Vertex Colors**.
+   - If you want vertex groups, check "Create Vertex Groups from Loose Parts" first.
+3. To bake the colors to a texture, click **Bake Vertex Colors to Image**.
 
 ### Lightmap UVs
 
 1. Select your mesh(es).
-2. In the **Game Tools** panel, enable **AutoUnwrap Lightmap UVs**.
+2. Check **AutoUnwrap Lightmap UVs** in the panel.
 3. Click **Create Lightmap UVs**.
 
-### Naming and Export Tools
+### Naming & Export
 
-- Set prefixes, suffixes, and export paths as needed for Unreal Engine compatibility.
+- Set your prefixes, suffixes, and export paths as needed.
 
 ---
 
 ## Requirements
 
 - Blender 3.0 or newer (tested on Blender 4.3)
+- Cycles render engine (for baking vertex colors to a texture)
 
 ---
 
 ## Known Issues
 
-- **Performance:** The loose parts detection can be slow on very large or complex meshes.
-- **Vertex Color Layer Overwrite:** If you run the loose parts tool multiple times, it will create multiple "LooseParts" vertex color layers.
-- **Bake Node Setup:** The bake operator replaces certain nodes in the active material; custom node setups may be affected.
-- **No Undo for Some Actions:** Some operations (like UV creation) may not be fully undoable in all Blender versions.
-- **Limited Color Palette:** If you have more loose parts than colors in the palette, colors will repeat.
+- **Slow on Big Meshes:** If your mesh has a ton of loose parts or vertices, the loose parts tool can take a while.
+- **Vertex Color Layers:** Running the loose parts tool more than once will keep making new "LooseParts" layers.
+- **Bake Node Setup:** The bake operator messes with your material nodes—if you have a fancy node setup, it might get changed.
+- **Limited Colors:** If you have more loose parts than colors in the palette, colors will repeat.
+- **Undo:** Some things (like UV creation) might not undo perfectly.
 
 ---
 
-## Planned Features
+## Plans for the Future
 
-- **Faster Loose Parts Detection:** Optimize the algorithm for large meshes.
-- **Custom Color Palettes:** Allow users to define their own color sets.
-- **Batch Export Tools:** Export multiple assets with one click.
-- **Better Error Handling:** More robust checks and user feedback.
-- **Support for More Bake Types:** Including AO, normals, etc.
-- **Improved UI/UX:** More intuitive controls and documentation in the Blender UI.
+- Make loose part detection faster for big meshes.
+- Let you pick your own color palette.
+- Batch export tools for lots of assets at once.
+- More robust error messages and checks.
+- Support for baking other maps (AO, normals, etc).
+- Nicer UI and more in-panel help.
 
 ---
 
-## Development
+## Contributing
 
-Feel free to fork, contribute, or submit issues!
+If you find a bug, have an idea, or want to help out, open an issue or a pull request!
 
 ---
 
