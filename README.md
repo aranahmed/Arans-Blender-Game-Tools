@@ -1,6 +1,6 @@
 # Aran's Game Tools for Blender
 
-Welcome to **Aran's Game Tools**! This Blender add-on is a collection of little helpers for anyone prepping assets for Unreal Engine or just wanting to speed up some repetitive Blender tasks. It's not perfect, but it gets the job done and saves you some clicks.
+This Blender add-on is a collection of little helpers for anyone prepping assets for Unreal Engine or just wanting to speed up some repetitive Blender tasks. It's not perfect, but it gets the job done and saves you some clicks.
 
 ---
 
