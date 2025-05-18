@@ -8,6 +8,7 @@ Welcome to **Aran's Game Tools**! This Blender add-on is a collection of little 
 
 - **Loose Parts to Vertex Colors:**  
   Quickly color each floating mesh island (loose part) with a unique vertex color. Great for making ID maps.
+  Identifies and combines overlapped geo to same vertex colour.
 
 - **Bake Vertex Colors to Texture:**  
   Take those vertex colors and bake them down to a texture you can export.
