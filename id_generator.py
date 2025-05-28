@@ -1,5 +1,6 @@
 import bpy
 import random
+from collections import defaultdict
 
 HIGH_CONTRAST_COLORS = {
     "Red":     (1, 0, 0, 1),
@@ -14,6 +15,82 @@ class OBJECT_OT_loose_parts_to_vertex_colors(bpy.types.Operator):
     bl_idname = "object.loose_parts_to_vertex_colors"
     bl_label = "Loose Parts to Vertex Colors"
     bl_options = {'REGISTER', 'UNDO'}
+
+    def check_for_overlapping_uvs(self, context, used_colors):
+        print("Checking for overlapping UVs...")
+        obj = bpy.context.active_object
+        mesh = obj.data
+        uv_layer = mesh.uv_layers.active.data
+
+        # Map rounded UVs to list of vertex indices
+        uv_to_verts = defaultdict(set)
+        for poly in mesh.polygons:
+            for li in poly.loop_indices:
+                uv = uv_layer[li].uv
+                # Round to 4 decimals to avoid floating point issues
+                uv_key = (round(uv.x, 4), round(uv.y, 4))
+                vert_idx = mesh.loops[li].vertex_index
+                uv_to_verts[uv_key].add(vert_idx)
+
+        # Find overlapped UVs (more than one vertex per UV)
+        overlapped_verts = set()
+        for verts in uv_to_verts.values():
+            if len(verts) > 1:
+                overlapped_verts.update(verts)
+
+        # # Assign to a vertex group
+        # vg = obj.vertex_groups.get("OverlappedUVs")
+        # if not vg:
+        #     vg = obj.vertex_groups.new(name="OverlappedUVs")
+        # vg.add(list(overlapped_verts), 1.0, 'REPLACE')
+
+        # Assign a unique vertex color to all overlapped UVs
+        # Context from the colour picked before
+        
+        overlap_color = None  # Initialize to None
+        for color in HIGH_CONTRAST_COLORS.values():
+            print(overlap_color)
+            if color not in used_colors:
+                overlap_color = color
+                break
+
+        if overlap_color is None:
+            
+            while True:
+                candidate = (random.random(), random.random(), random.random(), 1)
+                if candidate not in used_colors:
+                    overlap_color = candidate
+                    break
+
+         # Use the currently active vertex color layer
+        vcol = mesh.vertex_colors.new(name="OverlappedUVs") if not mesh.vertex_colors else mesh.vertex_colors.active
+        if vcol is None:
+            self.report({'ERROR'}, "No active vertex color layer found!")
+            return {'CANCELLED'}
+
+        if len(mesh.vertex_colors) >= 8:  # Blender's default limit is 8
+            self.report({'ERROR'}, "Too many vertex color layers!")
+            return {'CANCELLED'}
+
+        # Assign color to all loops whose vertex is in overlapped_verts
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vert_idx = mesh.loops[loop_idx].vertex_index
+                if vert_idx in overlapped_verts:
+                    vcol.data[loop_idx].color = overlap_color
+
+                # Optionally, clear color for non-overlapped verts (for clarity)
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vert_idx = mesh.loops[loop_idx].vertex_index
+                if vert_idx not in overlapped_verts:
+                    vcol.data[loop_idx].color = (0, 0, 0, 1)  # Black or transparent
+
+
+        print(f"Assigned {len(overlapped_verts)} vertices to 'OverlappedUVs' group.")
+
+        
+
 
     def execute(self, context):
         obj = context.active_object
@@ -57,14 +134,19 @@ class OBJECT_OT_loose_parts_to_vertex_colors(bpy.types.Operator):
             self.report({'WARNING'}, "More parts than unique colors! Some colors will repeat.")
         random.shuffle(color_names)
 
+        used_colors = set()
         # Assign colors by loose part
         for i, group in enumerate(parts):
             color_name = color_names[i % len(color_names)]
             color_value = HIGH_CONTRAST_COLORS[color_name]
+            used_colors.add(color_name)
             for poly in mesh.polygons:
                 if any(vidx in group for vidx in poly.vertices):
                     for loop_idx in poly.loop_indices:
                         vcol.data[loop_idx].color = color_value
+
+
+            
 
             # If the toggle is enabled, create a vertex group for this loose part
             if context.scene.create_vertex_groups_from_loose_parts:
@@ -72,10 +154,9 @@ class OBJECT_OT_loose_parts_to_vertex_colors(bpy.types.Operator):
                 if vg_name not in obj.vertex_groups:
                     vg = obj.vertex_groups.new(name=vg_name)
                     vg.add(list(group), 1.0, 'ADD')
+            
+            #self.check_for_overlapping_uvs(context, used_colors)
 
-
-
-        
 
         self.report({'INFO'}, f"Assigned vertex colors to {len(parts)} loose parts.")
         return {'FINISHED'}
@@ -99,6 +180,12 @@ class VIEW3D_PT_ID_Map_Baker(bpy.types.Panel):
 
         layout.operator("object.bake_vertex_colors_to_image", icon='EXPORT')
 
+        layout.prop(scene, "export_baked_ID", text="//", icon='FOLDER_REDIRECT')
+
+
+        layout.operator("object.detect_overlapping_uvs", icon='NONE')
+
+
         
 
 class OBJECT_OT_bake_vertex_colors_to_image(bpy.types.Operator):
@@ -118,7 +205,7 @@ class OBJECT_OT_bake_vertex_colors_to_image(bpy.types.Operator):
             obj.data.uv_layers.new(name="UVMap")
 
         # Create a new image
-        img = bpy.data.images.new("BakedVertexColors", width=1024, height=1024)
+        img = bpy.data.images.new(f"{obj.name}_ID", width=1024, height=1024)
 
         # Ensure material and node setup
         mat = obj.active_material
@@ -173,6 +260,64 @@ class OBJECT_OT_bake_vertex_colors_to_image(bpy.types.Operator):
         self.report({'INFO'}, "Vertex colors baked and image saved as baked_vertex_colors.png")
         return {'FINISHED'}
 
+class OBJECT_OT_detect_overlapping_uvs(bpy.types.Operator):
+    """Detect overlapping UVs"""
+    bl_idname = "object.detect_overlapping_uvs"
+    bl_label = "Detect Overlapping UVs"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = bpy.context.active_object
+        mesh = obj.data
+        uv_layer = mesh.uv_layers.active.data
+
+        # Map rounded UVs to list of vertex indices
+        uv_to_verts = defaultdict(set)
+        for poly in mesh.polygons:
+            for li in poly.loop_indices:
+                uv = uv_layer[li].uv
+                # Round to 4 decimals to avoid floating point issues
+                uv_key = (round(uv.x, 4), round(uv.y, 4))
+                vert_idx = mesh.loops[li].vertex_index
+                uv_to_verts[uv_key].add(vert_idx)
+
+        # Find overlapped UVs (more than one vertex per UV)
+        overlapped_verts = set()
+        for verts in uv_to_verts.values():
+            if len(verts) > 1:
+                overlapped_verts.update(verts)
+
+        # Assign to a vertex group
+        vg = obj.vertex_groups.get("OverlappedUVs")
+        if not vg:
+            vg = obj.vertex_groups.new(name="OverlappedUVs")
+        vg.add(list(overlapped_verts), 1.0, 'REPLACE')
+
+        # Assign a unique vertex color to all overlapped UVs
+        # Pick a color (e.g., Magenta)
+        overlap_color = (1, 0, 1, 1)  # Magenta RGBA
+
+        if not mesh.vertex_colors:
+            vcol = mesh.vertex_colors.new(name="OverlappedUVs")
+        else:
+            vcol = mesh.vertex_colors.active
+
+        if len(mesh.vertex_colors) >= 8:  # Blender's default limit is 8
+            self.report({'ERROR'}, "Too many vertex color layers!")
+            return {'CANCELLED'}
+
+        # Assign color to all loops whose vertex is in overlapped_verts
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vert_idx = mesh.loops[loop_idx].vertex_index
+                if vert_idx in overlapped_verts:
+                    vcol.data[loop_idx].color = overlap_color
+
+
+        print(f"Assigned {len(overlapped_verts)} vertices to 'OverlappedUVs' group.")
+
+        return {'FINISHED'}
+
 def properties():
     
     bpy.types.Scene.create_vertex_groups_from_loose_parts = bpy.props.BoolProperty(
@@ -184,6 +329,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_loose_parts_to_vertex_colors)
     bpy.utils.register_class(VIEW3D_PT_ID_Map_Baker)
     bpy.utils.register_class(OBJECT_OT_bake_vertex_colors_to_image)
+    bpy.utils.register_class(OBJECT_OT_detect_overlapping_uvs)
 
     properties()
 
@@ -191,6 +337,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_loose_parts_to_vertex_colors)
     bpy.utils.unregister_class(VIEW3D_PT_ID_Map_Baker)
     bpy.utils.unregister_class(OBJECT_OT_bake_vertex_colors_to_image)
+    bpy.utils.unregister_class(OBJECT_OT_detect_overlapping_uvs)
 
 if __name__ == "__main__":
     register()

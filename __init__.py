@@ -17,9 +17,20 @@ bl_info = {
     "category": "Game Development",
 }
 
+from .id_generator import (
+    OBJECT_OT_loose_parts_to_vertex_colors, 
+    VIEW3D_PT_ID_Map_Baker, 
+    OBJECT_OT_bake_vertex_colors_to_image, 
+    OBJECT_OT_detect_overlapping_uvs, properties
+)
+
+
 from .renaming_export import (
     UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix, properties
 )
+
+# from .LOD_generation_tool import (
+
 
 
 # class SuffixForLODAssets(bpy.types.Panel):
@@ -106,7 +117,7 @@ class VIEW3D_PT_CreateLightMapUVs(bpy.types.Panel):
         layout.prop(scene, "create_lightmap_uvs")
         
         # Export button
-        layout.operator("object.create_lightmap_uvs", icon='EXPORT')
+        layout.operator("object.create_lightmap_uvs")
 
 class OBJECT_OT_CreateLightmapUVs(bpy.types.Operator):
 
@@ -156,6 +167,18 @@ class OBJECT_OT_CreateLightmapUVs(bpy.types.Operator):
 
 def properties():
 
+    bpy.types.Scene.create_vertex_groups_from_loose_parts = bpy.props.BoolProperty(
+    name="Create Vertex Groups from Loose Parts",
+    description="Create vertex groups from loose parts",
+    default=False
+    )
+
+    bpy.types.Scene.export_baked_ID = StringProperty(
+        name="Export Baked ID Location",
+        description="Export Baked ID",
+        default= "//",
+        subtype='DIR_PATH'
+    )
         
     bpy.types.Scene.prefix_for_ue = StringProperty(
     name="PREFIX FOR UNREAL Static Mesh",
@@ -206,7 +229,12 @@ def properties():
     )
 
         
-classes = [UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix, VIEW3D_PT_CreateLightMapUVs, OBJECT_OT_CreateLightmapUVs]
+classes = [ UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix,
+            VIEW3D_PT_CreateLightMapUVs, OBJECT_OT_CreateLightmapUVs,
+            OBJECT_OT_loose_parts_to_vertex_colors, 
+            VIEW3D_PT_ID_Map_Baker,
+            OBJECT_OT_bake_vertex_colors_to_image,
+            OBJECT_OT_detect_overlapping_uvs]
 
 def register():
     # Register the classes

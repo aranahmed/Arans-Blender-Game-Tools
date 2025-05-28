@@ -65,6 +65,7 @@ class LODGeneratorTool(bpy.types.Operator):
             
 
             # Apply decimation modifier
+            print(f"Applying LOD {i} with reduction ratio: {reduction_ratio}")
             reduction_factor = reduction_ratio ** i
             decimate_mod = lod_obj.modifiers.new(name=f"LOD_{i}_Decimate", type='DECIMATE')
             decimate_mod.ratio = reduction_factor

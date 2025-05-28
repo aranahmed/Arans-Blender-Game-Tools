@@ -166,7 +166,7 @@ class OBJECT_OT_BakeMorphTextures(bpy.types.Operator):
                 obj,
                 [0, 60],  # Frame range
                 1.0,  # Scale
-                "page_turn",  # Name
+                "T_VAT_" + obj.name,  # Name
                 output_dir  # Output directory
             )
             self.report({'INFO'}, "Morph textures baked successfully")

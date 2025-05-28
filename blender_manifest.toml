@@ -2,11 +2,11 @@ schema_version = "1.0.0"
 
 # Example of manifest file for a Blender extension
 # Change the values according to your extension
-id = "gameassetpipelinetool"
+id = "aransblendergametools"
 version = "1.0.0"
-name = "Gameassetpipelinetool"
-tagline = "This is another extension"
-maintainer = "GameAssetPipelineTool"
+name = "Arans Blender Game Tools"
+tagline = "GameDevTools"
+maintainer = "Aran"
 # Supported types: "add-on", "theme"
 type = "add-on"
 
