@@ -22,6 +22,32 @@ This Blender add-on is a collection of little helpers for anyone prepping assets
 - **Naming and Export Helpers:**  
   Set up prefixes, suffixes, and export paths for Unreal Engine assets.
 
+  ## CSV-Driven Asset Validation & Management
+
+- **CSV-Based Asset Validation:**  
+  Automatically checks selected objects against a CSV file containing your asset data (name, type, master material, etc).
+
+- **Smart Renaming:**  
+  If an object's name doesn't match the CSV (including prefix rules), the tool can prompt you to rename it to the correct convention.
+
+- **Batch Correction:**  
+  See all naming mismatches at once and choose to batch-rename all assets to match your CSV.
+
+- **Custom Properties Assignment:**  
+  Assigns asset metadata (like `AssetName`, `AssetType`, `MasterMaterial`) as custom properties on your Blender objects, based on the CSV.
+
+- **Master Material Assignment:**  
+  Automatically assigns the correct master material from the CSV to your objects, creating the material if it doesn't exist.
+
+- **Error Reporting:**  
+  Clear popups and UI feedback for missing CSV data, incorrect names, or missing materials.
+
+- **UI Integration:**  
+  All CSV validation and correction tools are available in the **CSV2Mesh** tab in the 3D Viewport sidebar.
+
+---
+
+
 ---
 
 ## How to Install
