@@ -214,18 +214,34 @@ class CSV2MESH_PT_ToolsPanel(bpy.types.Panel):
         layout.label(text="Asset Management Tools", icon='ASSET_MANAGER')
         #layout.operator("csv2mesh.show_name_correction", text="Asset Name Correction", icon='ERROR')
         layout.prop(context.scene, "show_custom_props", text="Display Custom Properties")
-        if context.scene.show_custom_props:
-            # Display custom properties of the active object as a read-only list
-            obj = context.active_object
-            if obj:
-                layout.label(text="Custom Properties:", icon='PRESET')
-                box = layout.box()
-                for k, v in obj.items():
-                    if not k.startswith("_"):
-                        row = box.row()
-                        row.label(text=f"{k}: {v}")
-            else:
-                layout.label(text="No active object selected.", icon='ERROR')
+        
+        def draw_custom_props(self, context):
+            
+            if context.scene.show_custom_props:
+                # Display custom properties of the active object as a read-only list
+                obj = context.active_object
+                if obj:
+                    layout.label(text="Custom Properties:", icon='PRESET')
+                    box = layout.box()
+                    for k, v in obj.items():
+                        if not k.startswith("_"):
+                            row = box.row()
+                            row.label(text=f"{k}: {v}")
+                else:
+                    layout.label(text="No active object selected.", icon='ERROR')
+        draw_custom_props(self, context)
+        #layout.operator("csv2mesh.display_custom_props", text="Display Custom Properties", icon='TEXT') 
+
+        layout.separator()
+        layout.label(text="Mesh Validation Tools", icon='CHECKMARK')
+        layout.operator("csv2mesh.validate_triangle_count", text="Validate Triangle Count", icon='TRIA_DOWN')
+        
+        #layout.column(align=True)
+        
+        #layout.column().label(text="Triangle Count Validation", icon='TRIA_DOWN')   
+        #layout.column().operator("csv2mesh.triangle_count_validation", text="Validate Triangle Count", icon='TRIA_DOWN')
+        
+
 
 class CSV2MESH_OT_ShowNameCorrection(bpy.types.Operator):
     bl_idname = "csv2mesh.show_name_correction"
@@ -269,6 +285,36 @@ class CSV2MESH_OT_DisplayCustomProps(bpy.types.Operator):
             print_custom_properties(obj)
         self.report({'INFO'}, "Displayed custom properties.")
         return {'FINISHED'}
+    
+class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
+    bl_idname = "csv2mesh.validate_triangle_count"
+    bl_label = "Validate Triangle Count"
+    bl_description = "Validate triangle count of selected objects against CSV data"
+
+    def execute(self, context):
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                asset_name = strip_prefix(obj.name)
+                row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
+                if not row:
+                    show_message(f"No CSV row found for {obj.name}.", title="CSV Row Not Found", icon='ERROR')
+                    continue
+
+                expected_triangles = int(row.get('ExpectedTriangles', 0))
+                actual_triangles = len(obj.data.polygons)
+
+                if actual_triangles != expected_triangles:
+                    show_message(
+                        f"Triangle count mismatch for {obj.name}: Expected {expected_triangles}, got {actual_triangles}.",
+                        title="Triangle Count Mismatch",
+                        icon='ERROR'
+                    )
+                else:
+                    show_message(f"Triangle count for {obj.name} is valid: {actual_triangles}.", title="Triangle Count Valid", icon='CHECKMARK')
+            else:
+                show_message(f"{obj.name} is not a mesh object.", title="Invalid Object Type", icon='ERROR')
+
+        return {'FINISHED'}
 
 # --- REGISTRATION ---
 
@@ -280,6 +326,7 @@ classes = (
     CSV2MESH_PT_ToolsPanel,
     CSV2MESH_OT_ShowNameCorrection,
     CSV2MESH_OT_DisplayCustomProps,
+    CSV2MESH_OT_ValidateTriangleCount
     
 )
 
