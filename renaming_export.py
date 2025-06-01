@@ -1,18 +1,30 @@
 import bpy
 from bpy.props import StringProperty, BoolProperty, IntProperty
 from bpy.types import Operator, Panel
+import os
 
 
 obj = bpy.context.active_object
 
-import csv
+
+#import csv
+import json
+
 
 
 # --- CONFIGURATION ---
-csv_path = "I:/Blender/MyScripts/csv_to_json/GameData.csv"  # Update this path!
+#csv_path = "I:/Blender/MyScripts/csv_to_json/GameData.csv"  # Update this path!
 add_to = "material"  # Options: 'object', 'material'
 
+def show_message(message="", title="Error", icon='ERROR'):
+    def draw(self, context):
+        self.layout.label(text=message)
+    bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
+
+
+# not using atm
+""" # Function to find asset name in CSV and compare with selected object
 def FindAssetName():
     # --- READ CSV ---
     material_map = {}
@@ -60,12 +72,19 @@ def FindAssetName():
             # Example: store in material_map if those columns exist
             if 'obj_name' in row_data and 'mat_name' in row_data:
                 material_map[row_data['obj_name']] = row_data['mat_name']
+"""
 
+# not using atm
+""" # Function to check asset type based on the asset name
 def CheckAssetType(asset_name):
-    # This function can be implemented as needed
+    
     pass
+"""
 
-
+def show_message(message="", title="Error", icon='ERROR'):
+    def draw(self, context):
+        self.layout.label(text=message)
+    bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
 class UEExportPanel(bpy.types.Panel):
     bl_label = "Unreal Export"
@@ -79,20 +98,78 @@ class UEExportPanel(bpy.types.Panel):
         scene = context.scene
 
         # Export path property
-        layout.prop(scene, "ue_export_path")
+        layout.prop(scene, "ue_export_path", text="Export Path", icon='FILE_FOLDER')
+        layout.prop(scene, "ue_export_with_custom_props", text="Export with Custom Properties")
 
         # VFX Toggle
         layout.prop(scene, "ue_vfx_toggle", text="VFX Mesh")
-        
         # Toggle for single or multiple objects
         layout.prop(scene, "ue_export_multiple", text="Export Multiple Objects")
+        
+        #layout.prop(scene, "ue_export", text="Export Mesh", icon='EXPORT')
         
         # Export button
         layout.operator("export_scene.ue_export", icon='EXPORT')
 
         layout.separator()
 
-        layout.prop_decorator
+        layout.prop(scene, "custom_props_toggle", text="Export Custom Properties")
+        if scene.custom_props_toggle:
+            layout.prop(scene, "export_custom_props", text="Export JSON Path")
+            layout.operator("ueexportpanel.export_custom_props", icon='EXPORT')
+
+        
+
+class UEExportPanel_OT_Export(bpy.types.Operator):
+    bl_idname = "export_scene.ue_export"
+    bl_label = "Export to Unreal Engine"
+    bl_description = "Export the selected object(s) to Unreal Engine format"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        export_path = bpy.path.abspath(scene.ue_export_path)
+        vfx_toggle = scene.ue_vfx_toggle
+        export_multiple = scene.ue_export_multiple
+        prefix_for_ue = scene.prefix_for_ue
+        export_custom_props = scene.ue_export_with_custom_props
+        if not export_path:
+            self.report({'ERROR'}, "Export path is not set.")
+            return {'CANCELLED'}
+        if export_custom_props:
+            custom_props_path = bpy.path.abspath(export_path)
+            if export_multiple:
+                self.report({'ERROR'}, "Custom properties export is not supported for multiple objects.")
+                for obj in context.selected_objects:
+                    write_custom_properties_to_json(obj, custom_props_path)
+                    print(f"Custom properties for {obj.name} exported to {custom_props_path}")
+            else:
+                write_custom_properties_to_json(context.active_object, scene.export_custom_props)
+                
+
+            if not custom_props_path:
+                self.report({'ERROR'}, "Custom properties export path is not set.")
+                return {'CANCELLED'}
+        if not context.selected_objects:
+            self.report({'ERROR'}, "No objects selected for export.")
+            return {'CANCELLED'}
+        
+        if export_multiple:
+            for obj in context.selected_objects:
+                if prefix_for_ue:
+                    obj.name = f"{prefix_for_ue}_{obj.name}"
+                # Export logic for each object
+                print(f"Exporting {obj.name} to {export_path}")
+        else:
+            obj = context.active_object
+            if prefix_for_ue:
+                obj.name = f"{prefix_for_ue}_{obj.name}"
+            # Export logic for the active object
+            print(f"Exporting {obj.name} to {export_path}")
+
+
+        
+        return {'FINISHED'}
 
 
 
@@ -115,3 +192,118 @@ class PrefixForUE(bpy.types.Panel):
         # Add the button to execute the operator
         layout.operator("object.set_prefix_ue", icon='NONE')
 
+# Register the operator classes
+
+def write_custom_properties_to_json(obj, filepath):
+    
+    """Writes custom properties of the object to a JSON file."""
+    abs_path = bpy.path.abspath(filepath)
+    # Ensure json extension on file path
+    if not abs_path.endswith('.json'):
+        abs_path += '.json'
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)        
+    custom_props = {k: v for k, v in obj.items() if not k.startswith("_")}
+    # Optionally, you can filter out specific properties if needed
+    # Add Unreal Engine specific properties if needed
+    unreal_obj = {"name": obj.name}
+    unreal_obj.update(custom_props)
+
+    unreal_list = [unreal_obj]
+    # Write to JSON file
+    if not custom_props:
+        show_message("No custom properties found to export.", title="No Custom Properties", icon='ERROR')
+    with open(abs_path, 'w', encoding='utf-8') as f:
+        json.dump(unreal_list, f, indent=4)
+    #   bpy.context.window_manager.popup_menu(f"Custom properties written to {filepath}.", title="Custom Properties Exported", icon='INFO')
+    
+class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
+    bl_idname = "ueexportpanel.export_custom_props"
+    bl_label = "Export Custom Properties"
+    bl_description = "Export custom properties of selected objects to a JSON file"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+
+
+    def execute(self, context):
+        filepath = bpy.path.abspath(context.scene.export_custom_props)
+        if not filepath:
+             print("No export path specified for custom properties.")
+
+        for obj in context.selected_objects:
+            write_custom_properties_to_json(obj, filepath)
+        return {'FINISHED'}
+    
+classes = [
+    UEExportPanel,
+    PrefixForUE,
+    UEExportPanel_OT_ExportCustomProps, 
+    UEExportPanel_OT_Export
+
+]
+
+properties = {
+    "ue_export_path": StringProperty(
+        name="Export Path",
+        description="Path to export the asset",
+        default="//",
+        subtype='DIR_PATH'
+    ),
+    "ue_vfx_toggle": BoolProperty(
+        name="VFX Mesh",
+        description="Toggle for VFX mesh export",
+        default=False
+    ),
+    "ue_export_multiple": BoolProperty(
+        name="Export Multiple Objects",
+        description="Toggle for exporting multiple objects",
+        default=False
+    ),
+    "prefix_for_ue": StringProperty(
+        name="Prefix for UE",
+        description="Prefix to add to object names for Unreal Engine export",
+        default=""
+    ),
+    "custom_props_toggle": BoolProperty(
+        name="Export Custom Properties",
+        description="Toggle to export custom properties as JSON",
+        default=False
+    ),
+    "export_custom_props": StringProperty(
+        name="Export JSON Path",
+        description="Path to export custom properties as JSON",
+        default="//custom_properties.json",
+        subtype='FILE_PATH'
+    ),
+    "ue_export_with_custom_props": BoolProperty(
+        name="Export with Custom Properties",
+        description="Toggle to export with custom properties",
+        default=False
+    ),
+    "export_scene.ue_export": StringProperty(
+        name="Export Mesh",
+        description="Button to export the mesh",
+        default="Export Mesh",
+    )
+}
+
+def register(): 
+    
+    for prop_name, prop in properties.items():
+        setattr(bpy.types.Scene, prop_name, prop)
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    
+
+   
+
+def unregister():
+    for prop_name, prop in properties.items():
+        delattr(bpy.types.Scene, prop_name, prop)
+    
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
+
+     
+
+if __name__ == "__main__":
+    register()

@@ -43,12 +43,12 @@ def clear_custom_properties(obj):
         del obj[k]
     show_message(f"Cleared custom properties for {obj.name}.", title="Custom Properties Cleared", icon='INFO')
 
-def print_custom_properties(obj):
-    msg = f"Custom properties for {obj.name}:\n"
-    for k in obj.keys():
-        if not k.startswith("_"):
-            msg += f"  {k}: {obj[k]}\n"
-    show_message(msg, title="Custom Properties", icon='INFO')
+# def print_custom_properties(obj):
+#     msg = f"Custom properties for {obj.name}:\n"
+#     for k in obj.keys():
+#         if not k.startswith("_"):
+#             msg += f"  {k}: {obj[k]}\n"
+#     show_message(msg, title="Custom Properties", icon='INFO')
 
 # --- CSV DATA ACCESS ---
 
@@ -59,8 +59,6 @@ class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
     bl_description = "Set the path to the CSV file containing asset data"
     bl_options = {'REGISTER', 'UNDO'}
     
-    
-    
    
     def execute(self, context):
         global CSV_PATH
@@ -70,11 +68,12 @@ class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
         return {'FINISHED'}
     
     def get_csv_row_for_asset(asset_name):
-        csv_path = bpy.context.scene.csv_path
+        asset_name = asset_name # Normalize asset name
+        csv_path = bpy.context.scene.csv_path.lower()
         with open(csv_path, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                if strip_prefix(row.get('AssetName', '')) == strip_prefix(asset_name):
+                if strip_prefix(row.get('AssetName', '')).lower() == strip_prefix(asset_name).lower():
                     return row
         return None
     
@@ -113,7 +112,7 @@ def update_actual_tris_in_csv(asset_name, actual_tris, csv_path):
 def process_asset(obj):
     """Rename and tag the object based on CSV data."""
     clear_custom_properties(obj)
-    asset_name = strip_prefix(obj.name)
+    asset_name = strip_prefix(obj.name).lower()
     row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
     if not row:
         show_message(
@@ -146,10 +145,13 @@ def process_asset(obj):
             new_name = obj.name  # No change
     else:
         show_message("Asset type not found in CSV row.", title="Asset Type Not Found", icon='ERROR')
+        print(f"obj.name: {obj.name}, new_name: {new_name}")
+        print(f"Comparison result: {obj.name.lower() == new_name.lower()}")
         new_name = obj.name
 
+
     # Rename if needed
-    if obj.name != new_name:
+    if obj.name.lower() != new_name.lower():
         bpy.ops.csv2mesh.show_name_correction('INVOKE_DEFAULT', incorrect_name=obj.name, correct_name=new_name)
         show_message(f"Renaming object from '{obj.name}' to '{new_name}'", title="Renaming Object", icon='INFO')
     else:
@@ -190,7 +192,7 @@ def assign_master_material(obj, row=None):
         else:
             for i in range(len(obj.data.materials)):
                 obj.data.materials[i] = mat
-        show_message(f"Assigned material '{master_material}' to {obj.name}.", title="Material Assigned", icon='INFO')
+        #show_message(f"Assigned material '{master_material}' to {obj.name}.", title="Material Assigned", icon='INFO')
     else:
         show_message(f"Object '{obj.name}' is not a mesh, cannot assign material.", title="Invalid Object Type", icon='ERROR')
 
@@ -204,7 +206,7 @@ class CSV2MESH_OT_ProcessSelected(bpy.types.Operator):
     def execute(self, context):
         for obj in context.selected_objects:
             process_asset(obj)
-            print_custom_properties(obj)
+            #print_custom_properties(obj)
         self.report({'INFO'}, "Processed selected assets.")
         return {'FINISHED'}
 
@@ -355,10 +357,6 @@ class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
     bl_description = "Validate triangle count of selected objects against CSV data"
     bl_options = {'REGISTER', 'UNDO'}
 
-
-
-
-
     def execute(self, context):
         for obj in context.selected_objects:
             if obj.type == 'MESH':
@@ -398,6 +396,8 @@ class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
     
 
 
+
+
 # --- REGISTRATION ---
 
 classes = (
@@ -426,6 +426,13 @@ def register():
         name="Show Custom Properties",
         description="Display custom properties of the active object",
         default=False
+    )
+
+    bpy.types.Scene.csv2mesh_json_export_path = StringProperty(
+        name="JSON Export Path",
+        description="Path to export custom properties as JSON",
+        default="//custom_properties.json",
+        subtype='FILE_PATH'
     )
 
 
