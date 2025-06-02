@@ -75,6 +75,8 @@ class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
             for row in reader:
                 if strip_prefix(row.get('AssetName', '')).lower() == strip_prefix(asset_name).lower():
                     return row
+                if strip_prefix(row.get('AssetName', '')).lower() in asset_name.lower():
+                    return row
         return None
     
 # --- CSV Data Write Functions ---
@@ -114,13 +116,7 @@ def process_asset(obj):
     clear_custom_properties(obj)
     asset_name = strip_prefix(obj.name).lower()
     row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
-    if not row:
-        show_message(
-            message=f"No CSV row found for asset '{asset_name}'. Please check the CSV file.",
-            title="CSV Row Not Found",
-            icon='ERROR'
-        )
-        return
+    
 
     # Store original name if not already present
     if "original_name" not in obj:

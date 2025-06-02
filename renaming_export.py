@@ -3,6 +3,13 @@ from bpy.props import StringProperty, BoolProperty, IntProperty
 from bpy.types import Operator, Panel
 import os
 
+import pprint as pprint
+
+# import pathlib
+
+# path_to_json = pathlib.Path('.') / "UnrealExport"
+#print(f"Path to JSON: {path_to_json}")
+
 
 obj = bpy.context.active_object
 
@@ -86,7 +93,31 @@ def show_message(message="", title="Error", icon='ERROR'):
         self.layout.label(text=message)
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
-class UEExportPanel(bpy.types.Panel):
+def export_fbx(obj, export_path, apply_transform=True):
+    # Ensure the export directory exists
+    os.makedirs(os.path.dirname(export_path), exist_ok=True)
+    # Deselect all, select only the object to export
+    bpy.ops.object.select_all(action='DESELECT')
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    # Export FBX with Unreal-friendly settings
+    bpy.ops.export_scene.fbx(
+        filepath=export_path,
+        use_selection=True,
+        apply_unit_scale=True,
+        apply_scale_options='FBX_SCALE_ALL',
+        object_types={'MESH', 'ARMATURE'},
+        bake_space_transform=apply_transform,
+        axis_forward='-Z',
+        axis_up='Y',
+        use_mesh_modifiers=True,
+        add_leaf_bones=False,
+        path_mode='AUTO',
+        use_custom_props=True
+    )
+
+
+class UEExportPanel_PT_Export(bpy.types.Panel):
     bl_label = "Unreal Export"
     bl_idname = "VIEW3D_PT_unreal_export"
     bl_space_type = 'VIEW_3D'
@@ -129,51 +160,72 @@ class UEExportPanel_OT_Export(bpy.types.Operator):
     def execute(self, context):
         scene = context.scene
         export_path = bpy.path.abspath(scene.ue_export_path)
-        vfx_toggle = scene.ue_vfx_toggle
-        export_multiple = scene.ue_export_multiple
-        prefix_for_ue = scene.prefix_for_ue
-        export_custom_props = scene.ue_export_with_custom_props
-        if not export_path:
-            self.report({'ERROR'}, "Export path is not set.")
+        if not os.path.isdir(export_path):
+            os.makedirs(export_path, exist_ok=True)
+        obj = context.active_object
+        if not obj:
+            self.report({'ERROR'}, "No active object to export.")
             return {'CANCELLED'}
-        if export_custom_props:
-            custom_props_path = bpy.path.abspath(export_path)
-            if export_multiple:
-                self.report({'ERROR'}, "Custom properties export is not supported for multiple objects.")
-                for obj in context.selected_objects:
-                    write_custom_properties_to_json(obj, custom_props_path)
-                    print(f"Custom properties for {obj.name} exported to {custom_props_path}")
-            else:
-                write_custom_properties_to_json(context.active_object, scene.export_custom_props)
-                
+        export_name = obj.name
 
-            if not custom_props_path:
-                self.report({'ERROR'}, "Custom properties export path is not set.")
-                return {'CANCELLED'}
-        if not context.selected_objects:
+
+        selected_objects = context.selected_objects
+        if not selected_objects:
             self.report({'ERROR'}, "No objects selected for export.")
             return {'CANCELLED'}
         
-        if export_multiple:
-            for obj in context.selected_objects:
-                if prefix_for_ue:
-                    obj.name = f"{prefix_for_ue}_{obj.name}"
-                # Export logic for each object
-                print(f"Exporting {obj.name} to {export_path}")
-        else:
-            obj = context.active_object
-            if prefix_for_ue:
-                obj.name = f"{prefix_for_ue}_{obj.name}"
-            # Export logic for the active object
-            print(f"Exporting {obj.name} to {export_path}")
+        write_custom_properties_to_json(context.active_object, scene.export_custom_props)
+        
+        for obj in selected_objects:
+            export_name = obj.name
+            fbx_path = os.path.join(export_path, f"{export_name}.fbx")
+            export_fbx(obj, fbx_path, apply_transform=True)
+            if obj["original_name"] in obj.name:
+                return {'FINISHED'} 
+            else:
+                write_custom_properties_to_json(context.active_object, scene.export_custom_props)
 
+        # If exporting multiple objects, use the first selected object's name
+        #export_fbx(obj, fbx_path, apply_transform=True)
+
+
+
+        
+        # vfx_toggle = scene.ue_vfx_toggle
+        # export_multiple = scene.ue_export_multiple
+        # #prefix_for_ue = scene.prefix_for_ue
+        # export_custom_props = scene.ue_export_with_custom_props
+        # if not export_path:
+        #     self.report({'ERROR'}, "Export path is not set.")
+        #     return {'CANCELLED'}
+        # if export_custom_props:
+        #     custom_props_path = bpy.path.abspath(export_path)
+        #     if export_multiple:
+        #         #self.report({'ERROR'}, "Custom properties export is not supported for multiple objects.")
+        #         for obj in context.selected_objects:
+        #             write_custom_properties_to_json(obj, custom_props_path)
+        #             print(f"Custom properties for {obj.name} exported to {custom_props_path}")
+        #             export_fbx(obj, fbx_path, apply_transform=True)
+        #     else:
+        #         write_custom_properties_to_json(context.active_object, scene.export_custom_props)
+        #         export_fbx(context.active_object, fbx_path, apply_transform=True)
+                
+
+        #     if not custom_props_path:
+        #         self.report({'ERROR'}, "Custom properties export path is not set.")
+        #         return {'CANCELLED'}
+        # if not context.selected_objects:
+        #     self.report({'ERROR'}, "No objects selected for export.")
+        #     return {'CANCELLED'}
+        
+      
 
         
         return {'FINISHED'}
 
 
 
-class PrefixForUE(bpy.types.Panel):
+class UEExport_PT_PrefixNameChanger(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Prefix Name Changer"
     bl_idname = "VIEW3D_PT_prefix_for_ue"
@@ -196,24 +248,52 @@ class PrefixForUE(bpy.types.Panel):
 
 def write_custom_properties_to_json(obj, filepath):
     
-    """Writes custom properties of the object to a JSON file."""
+    """Appends or Writes custom properties of the object to a JSON file."""
     abs_path = bpy.path.abspath(filepath)
     # Ensure json extension on file path
     if not abs_path.endswith('.json'):
         abs_path += '.json'
     os.makedirs(os.path.dirname(abs_path), exist_ok=True)        
+
+    # Prepare the new data
     custom_props = {k: v for k, v in obj.items() if not k.startswith("_")}
-    # Optionally, you can filter out specific properties if needed
-    # Add Unreal Engine specific properties if needed
     unreal_obj = {"name": obj.name}
     unreal_obj.update(custom_props)
 
-    unreal_list = [unreal_obj]
+    
+    # Loads existing data if the file exists
+    if os.path.exists(abs_path):
+        with open(abs_path, 'r', encoding='utf-8') as f:
+            try: 
+                data = json.load(f)
+                if not isinstance(data, list):
+                    data = [data]
+            except Exception:
+                show_message("Error reading JSON file. It may be corrupted.", title="JSON Error", icon='ERROR')
+                data = []
+
+    else: 
+        data = []
+
+    # Update or append the new object data
+    updated = False
+    for i, entry in enumerate(data):
+        if entry.get("name") == obj.name:
+            data[i] = unreal_obj
+            updated = True
+            break
+    if not updated:
+        data.append(unreal_obj)
+
+ 
+    if "original_name" in obj:
+        del obj["original_name"]  # Remove original_name if it exists
+    
     # Write to JSON file
     if not custom_props:
         show_message("No custom properties found to export.", title="No Custom Properties", icon='ERROR')
     with open(abs_path, 'w', encoding='utf-8') as f:
-        json.dump(unreal_list, f, indent=4)
+        json.dump(data, f, indent=4)
     #   bpy.context.window_manager.popup_menu(f"Custom properties written to {filepath}.", title="Custom Properties Exported", icon='INFO')
     
 class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
@@ -234,8 +314,7 @@ class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
         return {'FINISHED'}
     
 classes = [
-    UEExportPanel,
-    PrefixForUE,
+    UEExportPanel_PT_Export,
     UEExportPanel_OT_ExportCustomProps, 
     UEExportPanel_OT_Export
 
