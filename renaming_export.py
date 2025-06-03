@@ -174,16 +174,24 @@ class UEExportPanel_OT_Export(bpy.types.Operator):
             self.report({'ERROR'}, "No objects selected for export.")
             return {'CANCELLED'}
         
-        write_custom_properties_to_json(context.active_object, scene.export_custom_props)
         
-        for obj in selected_objects:
-            export_name = obj.name
+        export_multiple = scene.ue_export_multiple
+        if export_multiple:
+            for obj in selected_objects:
+                if "original_name"  in obj:
+                    del obj["original_name"]
+                export_name = obj.name
+                fbx_path = os.path.join(export_path, f"{export_name}.fbx")
+                export_fbx(obj, fbx_path, apply_transform=True)
+                write_custom_properties_to_json(obj, scene.export_custom_props)
+
+                    
+        else:
+            # If exporting a single object, use the active object's name
             fbx_path = os.path.join(export_path, f"{export_name}.fbx")
             export_fbx(obj, fbx_path, apply_transform=True)
-            if obj["original_name"] in obj.name:
-                return {'FINISHED'} 
-            else:
-                write_custom_properties_to_json(context.active_object, scene.export_custom_props)
+            write_custom_properties_to_json(obj, scene.export_custom_props)
+            return {'FINISHED'}
 
         # If exporting multiple objects, use the first selected object's name
         #export_fbx(obj, fbx_path, apply_transform=True)
@@ -260,6 +268,9 @@ def write_custom_properties_to_json(obj, filepath):
     unreal_obj = {"name": obj.name}
     unreal_obj.update(custom_props)
 
+    if "original_name" in obj:
+        del obj["original_name"]  # Remove original_name if it exists
+
     
     # Loads existing data if the file exists
     if os.path.exists(abs_path):
@@ -286,8 +297,7 @@ def write_custom_properties_to_json(obj, filepath):
         data.append(unreal_obj)
 
  
-    if "original_name" in obj:
-        del obj["original_name"]  # Remove original_name if it exists
+    
     
     # Write to JSON file
     if not custom_props:
