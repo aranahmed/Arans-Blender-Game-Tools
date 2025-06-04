@@ -1,0 +1,6 @@
+AssetName,Category,MaxTris,ActualTris,TexResolution,Status,MasterMaterial,Notes
+Statue01,Environment,5000,4900,2048,Pending,PropLit,Need to import mesh
+CrateA,Prop,1200,6,1024,Approved,PropLit,Good naming and within budget
+EnemyGoblin01,Character,8000,6,4096,Pending,CharacterLit,Waiting for retopo
+DoorHeavy,Prop,2000,2340,1024,OverBudget,EnvLit,Reduce geo
+SignPost,Prop,600,580,512,Approved,EnvLit,Consider lower texture res

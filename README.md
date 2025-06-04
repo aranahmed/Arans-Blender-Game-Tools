@@ -1,126 +1,114 @@
 # Aran's Game Tools for Blender
 
-This Blender add-on is a collection of little helpers for anyone prepping assets for Unreal Engine or just wanting to speed up some repetitive Blender tasks. It's not perfect, but it gets the job done and saves you some clicks.
+**Aran's Game Tools** is a Blender add-on designed to streamline the asset pipeline between Blender and Unreal Engine, with a strong focus on **CSV-driven asset management** and seamless Unreal Python integration. This toolkit is ideal for game developers and technical artists who want to automate repetitive tasks, enforce naming/material conventions, and ensure their assets are always Unreal-ready.
 
 ---
 
-## What It Does
+## 🚀 Key Features
 
-- **Loose Parts to Vertex Colors:**  
-  Quickly color each floating mesh island (loose part) with a unique vertex color. Great for making ID maps.
-  Identifies and combines overlapped geo to same vertex colour.
+### CSV-Driven Asset Management
 
-- **Bake Vertex Colors to Texture:**  
-  Take those vertex colors and bake them down to a texture you can export.
+- **CSV-Based Validation:**  
+  Import a CSV file containing your asset data (name, type, master material, etc). The add-on checks selected Blender objects against this data, ensuring consistency and correctness.
 
-- **Vertex Groups from Loose Parts:**  
-  Optionally, make a vertex group for each loose part (if you want to select them later).
+- **Custom Properties from CSV:**  
+  Automatically assigns asset metadata (like `AssetName`, `AssetType`, `MasterMaterial`) as custom properties on your Blender objects, making your scene data-rich and ready for export.
 
-- **Lightmap UVs:**  
-  One-click creation of a second UV channel for lightmaps, ready for Unreal.
-
-- **Naming and Export Helpers:**  
-  Set up prefixes, suffixes, and export paths for Unreal Engine assets.
-
-  ## CSV-Driven Asset Validation & Management
-
-- **CSV-Based Asset Validation:**  
-  Automatically checks selected objects against a CSV file containing your asset data (name, type, master material, etc).
-
-- **Smart Renaming:**  
-  If an object's name doesn't match the CSV (including prefix rules), the tool can prompt you to rename it to the correct convention.
-
-- **Batch Correction:**  
-  See all naming mismatches at once and choose to batch-rename all assets to match your CSV.
-
-- **Custom Properties Assignment:**  
-  Assigns asset metadata (like `AssetName`, `AssetType`, `MasterMaterial`) as custom properties on your Blender objects, based on the CSV.
+- **Smart Renaming & Batch Correction:**  
+  Instantly spot naming mismatches and batch-rename all assets to match your CSV conventions, including prefix/suffix rules.
 
 - **Master Material Assignment:**  
-  Automatically assigns the correct master material from the CSV to your objects, creating the material if it doesn't exist.
+  Assigns the correct master material from your CSV to each object, creating the material if it doesn't exist.
 
 - **Error Reporting:**  
-  Clear popups and UI feedback for missing CSV data, incorrect names, or missing materials.
+  Clear UI feedback for missing CSV data, incorrect names, or missing materials.
 
-- **UI Integration:**  
-  All CSV validation and correction tools are available in the **CSV2Mesh** tab in the 3D Viewport sidebar.
+### Blender-to-Unreal Workflow
+
+- **Loose Parts to Vertex Colors:**  
+  Color each mesh island with a unique vertex color for easy ID map creation.
+
+- **Bake Vertex Colors to Texture:**  
+  Bake vertex colors to an image for export.
+
+- **Vertex Groups from Loose Parts:**  
+  Optionally create vertex groups for each loose part.
+
+- **Lightmap UVs:**  
+  One-click creation of a second UV channel for Unreal lightmaps.
+
+- **Naming & Export Helpers:**  
+  Set up prefixes, suffixes, and export paths for Unreal Engine assets.
+
+### Unreal Python Integration
+
+- **Automated Import:**  
+  Use the provided Unreal Python scripts to batch-import assets, read the same CSV, and automatically assign master materials and correct naming inside Unreal.
+
+- **Data Table Support:**  
+  Import your CSV/JSON data directly into Unreal Engine DataTables for further automation and validation.
 
 ---
 
+## 🎮 Use Cases in Game Development
+
+- **Consistent Asset Naming:**  
+  Enforce naming conventions across large teams and projects.
+
+- **Automated Material Assignment:**  
+  Guarantee every asset uses the correct master material, reducing manual errors.
+
+- **Metadata-Driven Workflows:**  
+  Store and transfer asset metadata from Blender to Unreal, enabling advanced pipelines (e.g., procedural spawning, gameplay tagging).
+
+- **Batch Asset Validation:**  
+  Quickly validate and correct hundreds of assets before export or import.
 
 ---
 
-## How to Install
+## 🛠️ How to Install
 
 1. Download or clone this repo.
-2. In Blender, go to **Edit > Preferences > Add-ons > Install**.
-3. Pick the `.zip` or the folder with this add-on.
+2. In Blender, go to `Edit > Preferences > Add-ons > Install`.
+3. Select the `.zip` or the folder with this add-on.
 4. Enable **Aran's Game Tools** in the add-ons list.
 
 ---
 
-## How to Use
+## 📝 How to Use
 
-Everything shows up in the **3D Viewport > Sidebar (N) > Game Tools** tab.
-
-### Vertex Color ID Map
-
-1. Select your mesh.
-2. In the panel, click **Loose Parts to Vertex Colors**.
-   - If you want vertex groups, check "Create Vertex Groups from Loose Parts" first.
-3. To bake the colors to a texture, click **Bake Vertex Colors to Image**.
-
-### Lightmap UVs
-
-1. Select your mesh(es).
-2. Check **AutoUnwrap Lightmap UVs** in the panel.
-3. Click **Create Lightmap UVs**.
-
-### Naming & Export
-
-- Set your prefixes, suffixes, and export paths as needed.
+- All tools are available in the 3D Viewport > Sidebar (`N`) > **Game Tools** tab.
+- Import your CSV in the **CSV2Mesh** panel.
+- Use the validation, renaming, and material assignment tools as needed.
+- Export your assets and use the Unreal Python scripts to automate import and setup in Unreal Engine.
 
 ---
 
-## Requirements
+## ⚡ Plans for Future Improvement
 
-- Blender 3.0 or newer (tested on Blender 4.3)
-- Cycles render engine (for baking vertex colors to a texture)
-
----
-
-## Known Issues
-
-- **Slow on Big Meshes:** If your mesh has a ton of loose parts or vertices, the loose parts tool can take a while.
-- **Vertex Color Layers:** Running the loose parts tool more than once will keep making new "LooseParts" layers.
-- **Bake Node Setup:** The bake operator messes with your material nodes—if you have a fancy node setup, it might get changed.
-- **Limited Colors:** If you have more loose parts than colors in the palette, colors will repeat.
-- **Undo:** Some things (like UV creation) might not undo perfectly.
+- **Faster loose part detection** for large meshes.
+- **Custom color palettes** for vertex color ID maps.
+- **Batch export tools** for large asset libraries.
+- **More robust error messages** and validation.
+- **Support for baking additional maps** (AO, normals, etc).
+- **Enhanced UI** and in-panel help.
+- **Deeper Unreal integration:**  
+  - Automated DataTable population  
+  - Blueprint and gameplay tag assignment  
+  - Asset reimport/update workflows
 
 ---
 
-## Plans for the Future
+## 🤝 Contributing
 
-- Make loose part detection faster for big meshes.
-- Let you pick your own color palette.
-- Batch export tools for lots of assets at once.
-- More robust error messages and checks.
-- Support for baking other maps (AO, normals, etc).
-- Nicer UI and more in-panel help.
+Found a bug? Have an idea? Want to help out?  
+Open an issue or a pull request!
 
 ---
 
-## Contributing
-
-If you find a bug, have an idea, or want to help out, open an issue or a pull request!
-
----
-
-## License
+## 📄 License
 
 MIT License
 
----
-
 **Author:** Aran Ahmed  
-**Category:** Game Development  
+**Category:** Game Development
