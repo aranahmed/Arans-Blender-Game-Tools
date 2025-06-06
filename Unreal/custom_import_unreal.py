@@ -374,24 +374,34 @@ def correct_material_instance_names(tool, material_instances_folder="/Game/Impor
             unreal.EditorAssetLibrary.rename_asset(material_instance, new_path)
             print(f"Renamed {material_instance} to {new_path}")
 
+
+@unreal.uclass()
+class MyPythonBridge(unreal.BlueprintFunctionLibrary):
+    @unreal.ufunction(static=True, meta=dict(Category="MyTools"))
+    def run_import_tool():
+        tool = ImportAssetTool(r"I:/Blender/MyScripts_Clone/AssetsToExportToUnreal", "/Game/ImportedAssets")
+        tool.import_all()
+        
+    
+
 #Example usage:
-tool = ImportAssetTool(r"I:\Blender\MyScripts_Clone\AssetsToExportToUnreal", "/Game/ImportedAssets")
+# tool = ImportAssetTool(r"I:/Blender/MyScripts_Clone/AssetsToExportToUnreal","/Game/ImportedAssets")
 
-json_import = tool.import_json_to_data_table("custom.json", "/Game/Python/OnImportJSON/DT_CustomMeshes")
-
-
+# json_import = tool.import_json_to_data_table("custom.json", "/Game/Python/OnImportJSON/DT_CustomMeshes")
 
 
-struct_for_json ={
-                  "AssetName": "Mesh",
-                  "AssetType" : "Type",
-                  "MasterMaterial" : "MM_PropLit"}
+
+
+# struct_for_json ={
+#                   "AssetName": "Mesh",
+#                   "AssetType" : "Type",
+#                   "MasterMaterial" : "MM_PropLit"}
 
 
 
 #tool.search_and_update_json("custom.json", new_data)
 
-imported = tool.import_all()
-print("Imported assets:", imported)
+# imported = tool.import_all()
+# print("Imported assets:", imported)
 #correct_material_instance_names(tool, material_instances_folder="/Game/ImportedAssets/MaterialInstances", json_filename="custom.json")
 
