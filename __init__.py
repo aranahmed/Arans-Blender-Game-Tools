@@ -9,11 +9,11 @@ bl_info = {
     "name": "Arans Game Tools",
     "description": "Description of this addon",
     "author": "Aran Ahmed",
-    "version": (0, 0, 1),
+    "version": (0, 0, 2),
     "blender": (4, 3, 0),
     "location": "View3D",
-    "warning": "Early version.",
-    "wiki_url": "",
+    "warning": "Early Alpha Version",
+    "wiki_url": "https://github.com/aranahmed/Arans-Blender-Game-Tools",
     "category": "Game Development",
 }
 
@@ -28,6 +28,11 @@ from .id_generator import (
 from .renaming_export import (
     UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix, properties
 )
+
+from . import csv_to_mesh_validator 
+
+modules = [csv_to_mesh_validator. renaming_export, id_generator]
+
 
 # from .LOD_generation_tool import (
 
@@ -244,11 +249,21 @@ def register():
     # Register the properties
     properties()
 
+    for m in modules:
+        if hasattr(m, 'register'):
+            m.register()
+
+
     
 def unregister():
     for cls in classes:
         if hasattr(bpy.types, cls.__name__):  # Check if the class is registered
             bpy.utils.unregister_class(cls)
+
+    for m in modules:
+        if hasattr(m, 'unregister'):
+            m.unregister()
+            
 
 if __name__ == "__main__":
         

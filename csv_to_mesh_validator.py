@@ -1,6 +1,6 @@
 import bpy
 
-from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty
+from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, CollectionProperty, PointerProperty
 import csv
 
 # --- CONFIGURATION ---
@@ -12,7 +12,10 @@ PREFIX_LIST = ['SM_', 'SK_', 'MM_']  # Unreal Engine naming conventions
 def is_triangle_count_within_budget(obj):
     if obj.type != 'MESH':
         return None  # Not applicable
-    asset_name = strip_prefix(obj.name)
+    root = obj
+    while root.parent:
+        root = root.parent
+    asset_name = strip_prefix(root.name)
     row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
     if not row:
         return None  # No CSV row found
@@ -28,6 +31,17 @@ def strip_prefix(name, prefixes=PREFIX_LIST):
     if "_" in name:
         return name.split("_", 1)[1]
     return name
+    
+def take_away_underscore(name):
+    """
+    Joins the two parts of the string split by the last underscore.
+    Example: "SM_Asset_LOD1" -> "SM_AssetLOD1"
+    """
+    if "_" in name:
+        parts = name.rsplit("_", 1)
+        return parts[0] + parts[1]
+    return name
+
 
 
 def show_message(message="", title="Error", icon='ERROR'):
@@ -69,13 +83,16 @@ class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
     
     def get_csv_row_for_asset(asset_name):
         asset_name = asset_name # Normalize asset name
+        asset_name = strip_prefix(asset_name).lower()
+        asset_name = take_away_underscore(asset_name.lower())
+
         csv_path = bpy.context.scene.csv_path.lower()
         with open(csv_path, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                if strip_prefix(row.get('AssetName', '')).lower() == strip_prefix(asset_name).lower():
+                if strip_prefix(row.get('AssetName', '')).lower() == asset_name:
                     return row
-                if strip_prefix(row.get('AssetName', '')).lower() in asset_name.lower():
+                if strip_prefix(row.get('AssetName', '')).lower() in asset_name:
                     return row
         return None
     
@@ -114,52 +131,67 @@ def update_actual_tris_in_csv(asset_name, actual_tris, csv_path):
 def process_asset(obj):
     """Rename and tag the object based on CSV data."""
     clear_custom_properties(obj)
-    asset_name = strip_prefix(obj.name).lower()
+    root = obj
+    while root.parent:
+        root = root.parent
+    asset_name = strip_prefix(root.name).lower()
     row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
+
+    if not row:
+        show_message(f"No CSV row found for asset '{asset_name}'. Please check the CSV file.", title="CSV Row Not Found", icon='ERROR')
+        return
     
 
     # Store original name if not already present
-    if "original_name" not in obj:
-        obj["original_name"] = obj.name
+    if "original_name" not in root:
+        root["original_name"] = root.name
 
     # Assign asset name property
-    obj["AssetName"] = row['AssetName']
-    show_message(f"Asset name '{row['AssetName']}' matches the selected object '{obj.name}'.", title="Asset Name Match", icon='INFO')
+    root["AssetName"] = row['AssetName']
+    show_message(f"Asset name '{row['AssetName']}' matches the selected rootect '{root.name}'.", title="Asset Name Match", icon='INFO')
 
     # Asset type logic
     asset_type = row.get('Category', None)
     if asset_type:
         show_message(f"Asset type '{asset_type}' found and stored.", title="Asset Type", icon='INFO')
         if asset_type in ("Environment", "Prop"):
-            obj["AssetType"] = "StaticMesh"
+            root["AssetType"] = "StaticMesh"
             new_name = f"SM_{row['AssetName']}"
         elif asset_type == "Character":
-            obj["AssetType"] = "SkeletalMesh"
+            root["AssetType"] = "SkeletalMesh"
             new_name = f"SK_{row['AssetName']}"
         else:
-            obj["AssetType"] = asset_type
-            new_name = obj.name  # No change
+            root["AssetType"] = asset_type
+            new_name = root.name  # No change
     else:
         show_message("Asset type not found in CSV row.", title="Asset Type Not Found", icon='ERROR')
-        print(f"obj.name: {obj.name}, new_name: {new_name}")
-        print(f"Comparison result: {obj.name.lower() == new_name.lower()}")
-        new_name = obj.name
+        print(f"root.name: {root.name}, new_name: {new_name}")
+        print(f"Comparison result: {root.name.lower() == new_name.lower()}")
+        new_name = root.name
 
 
     # Rename if needed
-    if obj.name.lower() != new_name.lower():
-        bpy.ops.csv2mesh.show_name_correction('INVOKE_DEFAULT', incorrect_name=obj.name, correct_name=new_name)
-        show_message(f"Renaming object from '{obj.name}' to '{new_name}'", title="Renaming Object", icon='INFO')
+    if root.name.lower() != new_name.lower():
+        if bpy.context.scene.csv2mesh_dont_ask_again:
+            old_name = root.name
+            root.name = new_name
+            show_message(f"Renamed rootect from '{old_name}' to '{new_name}' without confirmation.", title="Renaming Rootect", icon='INFO')
+        else:
+            bpy.ops.csv2mesh.show_name_correction('INVOKE_DEFAULT', incorrect_name=root.name, correct_name=new_name)
+            show_message(f"Renaming rootect from '{root.name}' to '{new_name}'", title="Renaming rootect", icon='INFO')
     else:
-        show_message(f"No renaming needed for {obj.name}, already matches '{new_name}'.", title="No Renaming Needed", icon='INFO')
+        show_message(f"No renaming needed for {root.name}, already matches '{new_name}'.", title="No Renaming Needed", icon='INFO')
 
     # Optionally assign master material
-    assign_master_material(obj, row)
+    assign_master_material(root, row)
 
 def assign_master_material(obj, row=None):
     """Assigns the master material from CSV to the object."""
     if not row:
-        asset_name = strip_prefix(obj.name)
+        root = obj
+        while root.parent:
+             root = root.parent
+        asset_name = strip_prefix(root.name)
         row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
         if not row:
             show_message(f"No CSV row found for {obj.name} for material assignment.", title="CSV Row Not Found", icon='ERROR')
@@ -177,20 +209,48 @@ def assign_master_material(obj, row=None):
     obj["MasterMaterial"] = master_material
     show_message(f"Assigned MasterMaterial '{master_material}' to {obj.name} as custom property.", title="Master Material Assigned", icon='INFO')
 
-    # Assign Blender material
-    mat = bpy.data.materials.get(master_material)
-    if not mat:
-        mat = bpy.data.materials.new(name=master_material)
-        show_message(f"Created new material: {master_material}", title="Material Created", icon='INFO')
-    if obj.type == 'MESH':
-        if not obj.data.materials:
-            obj.data.materials.append(mat)
+    # New Operation: Rename current material or Create a new one
+    # Rename check
+    mat = bpy.data.materials.get(obj.active_material.name) if obj.active_material else None
+    if mat:
+        if mat.name != master_material:
+            old_name = mat.name
+            mat.name = master_material
+            show_message(f"Renamed material from '{old_name}' to '{master_material}' for {obj.name}.", title="Material Renamed", icon='INFO')
         else:
-            for i in range(len(obj.data.materials)):
-                obj.data.materials[i] = mat
-        #show_message(f"Assigned material '{master_material}' to {obj.name}.", title="Material Assigned", icon='INFO')
-    else:
-        show_message(f"Object '{obj.name}' is not a mesh, cannot assign material.", title="Invalid Object Type", icon='ERROR')
+            show_message(f"Material '{master_material}' already assigned to {obj.name}.", title="Material Already Assigned", icon='INFO')
+
+    if mat is None:
+        # Create a new material if it doesn't exist
+        mat = bpy.data.materials.new(name=master_material)
+        show_message(f"Created new material: {master_material} for {obj.name}.", title="Material Created", icon='INFO')
+        # Assign the new material to the object
+        if obj.type == 'MESH':
+            if not obj.data.materials:
+                obj.data.materials.append(mat)
+            else:
+                # Replace existing materials with the new one
+                for i in range(len(obj.data.materials)):
+                    obj.data.materials[i] = mat
+            show_message(f"Assigned material '{master_material}' to {obj.name}.", title="Material Assigned", icon='INFO')
+
+    
+    
+    
+    # Create and Assign Blender material
+    # mat = bpy.data.materials.get(master_material)
+    # if not mat:
+    #     mat = bpy.data.materials.new(name=master_material)
+    #     show_message(f"Created new material: {master_material}", title="Material Created", icon='INFO')
+    # if obj.type == 'MESH':
+    #     if not obj.data.materials:
+    #         obj.data.materials.append(mat)
+    #     else:
+    #         for i in range(len(obj.data.materials)):
+    #             obj.data.materials[i] = mat
+    #     #show_message(f"Assigned material '{master_material}' to {obj.name}.", title="Material Assigned", icon='INFO')
+    # else:
+    #     show_message(f"Object '{obj.name}' is not a mesh, cannot assign material.", title="Invalid Object Type", icon='ERROR')
 
 # --- BLENDER OPERATORS AND PANEL ---
 
@@ -274,16 +334,23 @@ class CSV2MESH_PT_ToolsPanel(bpy.types.Panel):
         def compare_triangle_count(self, context):
             obj = context.active_object
             if obj is not None and context.selected_objects:
-               #layout.column(align=True)
-               box = layout.box()
-               row = box.row()
-               col1 = row.column(align=True)
-               col2 = row.column(align=True)
-               col1.label(text=f"Active Object: {obj.name}", icon='OBJECT_DATA')
-               col1.label(text=f"Actual Tris: {len(obj.data.polygons)}")
-               #layout.column(align=True)
-               col2.label(text="CSV Data", icon='FILE_TEXT')
-               col2.label(text=f"Max Tris: {CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(strip_prefix(obj.name)).get('MaxTris', 'N/A')}")
+                # Use parent name if available
+                root = obj
+                while root.parent:
+                    root = root.parent
+                asset_name = strip_prefix(root.name)
+                csv_row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
+                box = self.layout.box()
+                row = box.row()
+                col1 = row.column(align=True)
+                col2 = row.column(align=True)
+                col1.label(text=f"Active Object: {obj.name}", icon='OBJECT_DATA')
+                col1.label(text=f"Actual Tris: {len(obj.data.polygons)}")
+                col2.label(text="CSV Data", icon='FILE_TEXT')
+                if csv_row:
+                    col2.label(text=f"Max Tris: {csv_row.get('MaxTris', 'N/A')}")
+                else:
+                    col2.label(text="Max Tris: N/A")
 
 
         compare_triangle_count(self, context)
@@ -311,6 +378,7 @@ class CSV2MESH_OT_ShowNameCorrection(bpy.types.Operator):
 
     incorrect_name: StringProperty()
     correct_name: StringProperty()
+    dont_ask_again: BoolProperty()
 
     def execute(self, context):
         obj = bpy.data.objects.get(self.incorrect_name)
@@ -334,6 +402,7 @@ class CSV2MESH_OT_ShowNameCorrection(bpy.types.Operator):
         row = box.row()
         row.label(text=self.incorrect_name)
         row.label(text=self.correct_name)
+        layout.prop(context.scene, "csv2mesh_dont_ask_again", text="Don't ask me again")
         layout.label(text="Do you want to rename the asset?", icon='QUESTION')
 
 class CSV2MESH_OT_DisplayCustomProps(bpy.types.Operator):
@@ -343,8 +412,8 @@ class CSV2MESH_OT_DisplayCustomProps(bpy.types.Operator):
 
     def execute(self, context):
         for obj in context.selected_objects:
-            print_custom_properties(obj)
-        self.report({'INFO'}, "Displayed custom properties.")
+            #print_custom_properties(obj)
+            self.report({'INFO'}, "Displayed custom properties.")
         return {'FINISHED'}
     
 class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
@@ -356,7 +425,10 @@ class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
     def execute(self, context):
         for obj in context.selected_objects:
             if obj.type == 'MESH':
-                asset_name = strip_prefix(obj.name)
+                root = obj
+                while root.parent:
+                    root = root.parent
+                asset_name = strip_prefix(root.name)
                 row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
                 if not row:
                     show_message(f"No CSV row found for {obj.name}.", title="CSV Row Not Found", icon='ERROR')
@@ -391,7 +463,234 @@ class CSV2MESH_OT_ValidateTriangleCount(bpy.types.Operator):
         return {'FINISHED'}
     
 
+class CSV2MESH_PT_RenameOperationsPanel(bpy.types.Panel):
+    bl_label = "Rename Operations"
+    bl_idname = "CSV2MESH_PT_rename_operations_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "CSV2Mesh"
 
+    PREFIX_LIST = {
+        
+                    'StaticMesh':'SM_',
+                    
+                    'SkeletalMesh':'SK_',
+                    
+                    'MasterMaterial':'MM_'
+                    } # Unreal Engine naming conventions
+
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        obj = context.active_object
+
+
+        layout.label(text="Viewport Names", icon='VIEW3D')
+        # Updates the viewport display of asset names
+        box =layout.box()
+        box_row = box.row()
+        #box.prop(scene, "csv2mesh_toggle_show_asset_names", text="Show Asset Names in Viewport")
+        if obj and hasattr(obj, "show_name"):
+            box_row.prop(obj, "show_name", text="Show Name in Viewport")
+        else:
+            box_row.label(text="No active object selected.", icon='ERROR')
+
+        
+
+
+        # Button version because above doesnt work for multiple objects
+        box_row.operator("csv2mesh.show_all_asset_names_in_viewport", text="Toggle Asset Names in Viewport")            
+
+        layout.operator("csv2mesh.rename_operations", icon='TEXT')
+        layout.label(text="Custom Prefix List:", icon='PRESET')
+        row = layout.row()
+        row.template_list(
+            "CSV2MESH_UL_Prefixes", "",
+            scene, "csv2mesh_prefixes",
+            scene, "csv2mesh_prefix_index",
+            rows=3
+        )
+
+        col = row.column(align=True)
+        col.operator("csv2mesh.add_prefix", icon='ADD', text="")
+        col.operator("csv2mesh.remove_prefix", icon='REMOVE', text="")
+        col.separator()
+        
+        layout.operator("csv2mesh.assign_prefix", icon='PLUS', text="Assign Prefix to Active Object")
+        layout.operator("csv2mesh.reset_name_to_original", icon='FILE_REFRESH', text="Reset Name to Original")
+
+
+        # layout.row()
+        # #layout.label(text="Prefix list", icon='INFO')
+        #  # Display custom properties of the active object as a read-only list
+        
+        
+        # layout.label(text="Prefix List:", icon='PRESET')
+        # box = layout.box()
+        # for k, v in self.PREFIX_LIST.items():
+        #     row = box.row()
+        #     row.label(text=f"{k}: {v}")
+        # layout.separator()
+
+class CSV2MESH_OT_RenameOperations(bpy.types.Operator):
+    bl_idname = "csv2mesh.rename_operations"
+    bl_label = "Remove Underscore Operation"
+    bl_description = "Rename operations for selected objects based on CSV data"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        if not context.selected_objects:
+            show_message("No objects selected.", title="No Selection", icon='ERROR')
+            return {'CANCELLED'}
+        else:
+            for obj in context.selected_objects:
+                if obj.parent is None:
+                    obj["original_name"] = obj.name
+                    new_name = take_away_underscore(obj.name)
+                    obj.name = new_name
+            return {'FINISHED'}
+        
+       
+
+
+
+        
+class CSV2MESH_OT_PrefixItem(bpy.types.PropertyGroup):
+    label: StringProperty(name="Label")
+    prefix : StringProperty(name="Prefix", default="")
+            
+
+class CSV2MESH_OT_AssignPrefixes(bpy.types.Operator):
+    bl_idname = "csv2mesh.assign_prefix"
+    bl_label = "Assign Prefix"
+    bl_description = "Assign selected prefix to active object"
+
+    def execute(self, context):
+        scene = context.scene
+        idx = scene.csv2mesh_prefix_index
+        if not scene.csv2mesh_prefixes or idx >= len(scene.csv2mesh_prefixes):
+            show_message("No prefix selected.", title="Prefix Assignment", icon='ERROR')
+            return {'CANCELLED'}
+        prefix = scene.csv2mesh_prefixes[idx].prefix
+        obj = context.active_object
+        if obj:
+            # Remove existing known prefix
+            name_wo_prefix = strip_prefix(obj.name)
+            obj.name = prefix + "_" + name_wo_prefix
+            show_message(f"Assigned prefix '{prefix}' to '{obj.name}'", title="Prefix Assigned", icon='INFO')
+            return {'FINISHED'}
+        else:
+            show_message("No active object.", title="Prefix Assignment", icon='ERROR')
+            return {'CANCELLED'}
+
+
+    def populate_prefixes():
+        scene = bpy.context.scene
+        scene.csv2mesh_prefixes.clear()
+        for label, prefix in [
+            ("StaticMesh", "SM"),
+            ("SkeletalMesh", "SK"),
+            ("MasterMaterial", "MM"),
+        ]:
+            item = scene.csv2mesh_prefixes.add()
+            item.label = label
+            item.prefix = prefix
+
+
+class CSV2MESH_UL_Prefixes(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        # item: CSV2MESH_OT_PrefixItem
+        if self.layout_type in {'DEFAULT', 'COMPACT', 'GRID'}:
+            layout.prop(item, "label", text="")
+            layout.prop(item, "prefix", text="")
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text=item.prefix)
+
+class CSV2MESH_OT_AddPrefix(bpy.types.Operator):
+    bl_idname = "csv2mesh.add_prefix"
+    bl_label = "Add Prefix"
+    bl_description = "Add a new prefix to the prefix list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        item = scene.csv2mesh_prefixes.add()
+        item.label = "New Prefix"
+        item.prefix = "XX_"
+        scene.csv2mesh_prefix_index = len(scene.csv2mesh_prefixes) - 1
+        return {'FINISHED'}
+    
+class CSV2MESH_OT_RemovePrefix(bpy.types.Operator):
+    bl_idname = "csv2mesh.remove_prefix"
+    bl_label = "Remove Prefix"
+    bl_description = "Remove the selected prefix from the prefix list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        idx = scene.csv2mesh_prefix_index
+        if idx < len(scene.csv2mesh_prefixes):
+            scene.csv2mesh_prefixes.remove(idx)
+            scene.csv2mesh_prefix_index = max(0, idx - 1)
+            return {'FINISHED'}
+        else:
+            show_message("No prefix to remove.", title="Remove Prefix", icon='ERROR')
+            return {'CANCELLED'}
+
+class CSV2MESH_OT_ResetNameToOriginal(bpy.types.Operator):
+    bl_idname = "csv2mesh.reset_name_to_original"
+    bl_label = "Reset Name to Original"
+    bl_description = "Reset the name of the selected object to its original name"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and "original_name" in obj:
+            original_name = obj["original_name"]
+            obj.name = original_name
+            show_message(f"Reset name of {obj.name} to original name: {original_name}", title="Name Reset", icon='INFO')
+            return {'FINISHED'}
+        else:
+            show_message("No original name found for the active object.", title="No Original Name", icon='ERROR')
+            return {'CANCELLED'}
+        
+class CSV2MESH_OT_ShowAssetNamesInViewport(bpy.types.Operator):
+    bl_idname = "csv2mesh.show_asset_names_in_viewport"
+    bl_label = "Show Asset Names in Viewport"
+    bl_description = "Display asset names in the viewport for selected objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    # def execute(self, context):
+    #     for obj in context.selected_objects:
+    #         # Toggle the "Show Name" property in the object properties menu
+    #         # In Blender, this is 'show_name' for viewport display
+    #         if hasattr(obj, "show_name"):
+    #             obj.show_name = not obj.show_name
+    #     return {'FINISHED'}
+    
+    def update_show_asset_names(self, context):
+        value = context.scene.csv2mesh_toggle_show_asset_names
+        for obj in context.selected_objects:
+            if hasattr(obj, "show_name"):
+                obj.show_name = value
+        return {'FINISHED'}
+    
+class CSV2MESH_OT_ShowAllAssetNamesInViewport(bpy.types.Operator):
+    bl_idname = "csv2mesh.show_all_asset_names_in_viewport"
+    bl_label = "Toggle Asset Names in Viewport"
+    bl_description = "Toggle showing asset names in the viewport for all selected objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        value = not context.scene.csv2mesh_toggle_show_asset_names
+        context.scene.csv2mesh_toggle_show_asset_names = value
+        for obj in context.scene.objects:
+            if hasattr(obj, "show_name"):
+                obj.show_name = value
+        return {'FINISHED'}
+    
 
 
 # --- REGISTRATION ---
@@ -404,9 +703,23 @@ classes = (
     CSV2MESH_PT_ToolsPanel,
     CSV2MESH_OT_ShowNameCorrection,
     CSV2MESH_OT_DisplayCustomProps,
-    CSV2MESH_OT_ValidateTriangleCount
+    CSV2MESH_OT_ValidateTriangleCount,
+    CSV2MESH_PT_RenameOperationsPanel,
+    CSV2MESH_OT_RenameOperations,
+    CSV2MESH_OT_PrefixItem,
+    CSV2MESH_OT_AssignPrefixes,
+    CSV2MESH_UL_Prefixes,
+    CSV2MESH_OT_AddPrefix,
+    CSV2MESH_OT_RemovePrefix,
+    CSV2MESH_OT_ResetNameToOriginal,
+    CSV2MESH_OT_ShowAssetNamesInViewport,
+    CSV2MESH_OT_ShowAllAssetNamesInViewport,
+    
+
     
 )
+
+
 
 def register():
     for cls in classes:
@@ -423,18 +736,40 @@ def register():
         description="Display custom properties of the active object",
         default=False
     )
-
+    bpy.types.Scene.csv2mesh_dont_ask_again = BoolProperty(
+        name="Don't Ask Again",
+        description="Don't show the asset name correction dialog again",
+        default=False
+    )
     bpy.types.Scene.csv2mesh_json_export_path = StringProperty(
         name="JSON Export Path",
         description="Path to export custom properties as JSON",
         default="//custom_properties.json",
         subtype='FILE_PATH'
     )
+    bpy.types.Scene.csv2mesh_prefixes = CollectionProperty(type=CSV2MESH_OT_PrefixItem)
+
+    bpy.types.Scene.csv2mesh_prefix_index = IntProperty(
+        name="Prefix Index",
+        description="Index of the selected prefix",
+        default=0,
+        min=0
+    )
+
+    bpy.types.Scene.csv2mesh_toggle_show_asset_names = BoolProperty(
+        name="Show Asset Names in Viewport",
+        description="Toggle showing asset names in the viewport for selected objects",
+        default=False,
+        update=CSV2MESH_OT_ShowAssetNamesInViewport.update_show_asset_names
+    )
+
+    CSV2MESH_OT_AssignPrefixes.populate_prefixes()
+
 
 
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
-if __name__ == "__main__":
-    register()
+# if __name__ == "__main__":
+#     register()
