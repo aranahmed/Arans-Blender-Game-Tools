@@ -1,10 +1,19 @@
 import sys
 import unreal
+import os
 
-# Optionally add your tools folder to sys.path
-sys.path.append(r"I:/Unreal/EditorTools_2/EditorTools/Python")
+# Get the Unreal project directory
+project_dir = unreal.SystemLibrary.get_project_directory()
 
-# Import your main tool script (this registers your BlueprintFunctionLibrary, etc.)
+# Build the path to your tools folder relative to the project directory
+tools_path = os.path.join(project_dir, "Python")
+
+# Add to sys.path if not already present
+if tools_path not in sys.path:
+    sys.path.append(tools_path)
+
 import custom_import_unreal
 
-unreal.log("Custom import tools loaded at startup!")
+
+
+unreal.log(f"Tools Path: {tools_path}")
