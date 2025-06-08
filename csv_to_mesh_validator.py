@@ -504,6 +504,7 @@ class CSV2MESH_PT_RenameOperationsPanel(bpy.types.Panel):
 
         layout.operator("csv2mesh.rename_operations", icon='TEXT')
         layout.label(text="Custom Prefix List:", icon='PRESET')
+        layout.operator("csv2mesh.populate_prefixes", icon='IMPORT', text="Populate Default Prefixes")
         row = layout.row()
         row.template_list(
             "CSV2MESH_UL_Prefixes", "",
@@ -556,9 +557,9 @@ class CSV2MESH_OT_RenameOperations(bpy.types.Operator):
 
 
         
-class CSV2MESH_OT_PrefixItem(bpy.types.PropertyGroup):
+class CSV2MESH_PrefixItem(bpy.types.PropertyGroup):
     label: StringProperty(name="Label")
-    prefix : StringProperty(name="Prefix", default="")
+    prefix: StringProperty(name="Prefix", default="")
             
 
 class CSV2MESH_OT_AssignPrefixes(bpy.types.Operator):
@@ -585,28 +586,31 @@ class CSV2MESH_OT_AssignPrefixes(bpy.types.Operator):
             return {'CANCELLED'}
 
 
-    def populate_prefixes():
-        scene = bpy.context.scene
-        scene.csv2mesh_prefixes.clear()
-        for label, prefix in [
-            ("StaticMesh", "SM"),
-            ("SkeletalMesh", "SK"),
-            ("MasterMaterial", "MM"),
-        ]:
-            item = scene.csv2mesh_prefixes.add()
-            item.label = label
-            item.prefix = prefix
+        
 
 
 class CSV2MESH_UL_Prefixes(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        # item: CSV2MESH_OT_PrefixItem
         if self.layout_type in {'DEFAULT', 'COMPACT', 'GRID'}:
             layout.prop(item, "label", text="")
             layout.prop(item, "prefix", text="")
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
             layout.label(text=item.prefix)
+
+        def populate_prefixes():
+            scene = bpy.context.scene
+            scene.csv2mesh_prefixes.clear()
+            for label, prefix in [
+                ("StaticMesh", "SM"),
+                ("SkeletalMesh", "SK"),
+                ("MasterMaterial", "MM"),
+            ]:
+                item = scene.csv2mesh_prefixes.add()
+                item.label = label
+                item.prefix = prefix
+
+        populate_prefixes()
 
 class CSV2MESH_OT_AddPrefix(bpy.types.Operator):
     bl_idname = "csv2mesh.add_prefix"
@@ -670,7 +674,7 @@ class CSV2MESH_OT_ShowAssetNamesInViewport(bpy.types.Operator):
     #             obj.show_name = not obj.show_name
     #     return {'FINISHED'}
     
-    def update_show_asset_names(self, context):
+    def execute(self, context):
         value = context.scene.csv2mesh_toggle_show_asset_names
         for obj in context.selected_objects:
             if hasattr(obj, "show_name"):
@@ -706,7 +710,7 @@ classes = (
     CSV2MESH_OT_ValidateTriangleCount,
     CSV2MESH_PT_RenameOperationsPanel,
     CSV2MESH_OT_RenameOperations,
-    CSV2MESH_OT_PrefixItem,
+    CSV2MESH_PrefixItem,
     CSV2MESH_OT_AssignPrefixes,
     CSV2MESH_UL_Prefixes,
     CSV2MESH_OT_AddPrefix,
@@ -747,7 +751,7 @@ def register():
         default="//custom_properties.json",
         subtype='FILE_PATH'
     )
-    bpy.types.Scene.csv2mesh_prefixes = CollectionProperty(type=CSV2MESH_OT_PrefixItem)
+    bpy.types.Scene.csv2mesh_prefixes = CollectionProperty(type=CSV2MESH_PrefixItem)
 
     bpy.types.Scene.csv2mesh_prefix_index = IntProperty(
         name="Prefix Index",
@@ -760,10 +764,10 @@ def register():
         name="Show Asset Names in Viewport",
         description="Toggle showing asset names in the viewport for selected objects",
         default=False,
-        update=CSV2MESH_OT_ShowAssetNamesInViewport.update_show_asset_names
+        
     )
 
-    CSV2MESH_OT_AssignPrefixes.populate_prefixes()
+    
 
 
 
