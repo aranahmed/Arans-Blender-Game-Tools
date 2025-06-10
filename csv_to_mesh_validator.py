@@ -43,7 +43,7 @@ def take_away_underscore(name):
     return name
 
 
-
+# Debug method
 def show_message(message="", title="Error", icon='ERROR'):
     def draw(self, context):
         self.layout.label(text=message)
@@ -295,6 +295,8 @@ class CSV2MESH_PT_ToolsPanel(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = "CSV2Mesh"
 
+    
+
     def draw(self, context):
         layout = self.layout
         row = layout.row()
@@ -310,63 +312,67 @@ class CSV2MESH_PT_ToolsPanel(bpy.types.Panel):
         #layout.operator("csv2mesh.show_name_correction", text="Asset Name Correction", icon='ERROR')
         layout.prop(context.scene, "show_custom_props", text="Display Custom Properties")
         
-        def draw_custom_props(self, context):
-            
-            if context.scene.show_custom_props:
-                # Display custom properties of the active object as a read-only list
-                obj = context.active_object
-                if obj:
-                    layout.label(text="Custom Properties:", icon='PRESET')
-                    box = layout.box()
-                    for k, v in obj.items():
-                        if not k.startswith("_"):
-                            row = box.row()
-                            row.label(text=f"{k}: {v}")
-                else:
-                    layout.label(text="No active object selected.", icon='ERROR')
+        # Draw custom properties if the toggle is enabled
+        if context.scene.show_custom_props:
+            # Display custom properties of the active object as a read-only list
+            obj = context.active_object
+            if obj:
+                layout.label(text="Custom Properties:", icon='PRESET')
+                box = layout.box()
+                for k, v in obj.items():
+                    if not k.startswith("_"):
+                        row = box.row()
+                        row.label(text=f"{k}: {v}")
+            else:
+                layout.label(text="No active object selected.", icon='ERROR')
+    
+        #draw_custom_props(self, context)
         
-        draw_custom_props(self, context)
 
         layout.separator()
         layout.label(text="Mesh Validation Tools", icon='CHECKMARK')
         layout.operator("csv2mesh.validate_triangle_count", text="Validate Triangle Count", icon='TRIA_DOWN')
 
-        def compare_triangle_count(self, context):
-            obj = context.active_object
-            if obj is not None and context.selected_objects:
-                # Use parent name if available
-                root = obj
-                while root.parent:
-                    root = root.parent
-                asset_name = strip_prefix(root.name)
-                csv_row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
-                box = self.layout.box()
-                row = box.row()
-                col1 = row.column(align=True)
-                col2 = row.column(align=True)
-                col1.label(text=f"Active Object: {obj.name}", icon='OBJECT_DATA')
-                col1.label(text=f"Actual Tris: {len(obj.data.polygons)}")
-                col2.label(text="CSV Data", icon='FILE_TEXT')
-                if csv_row:
-                    col2.label(text=f"Max Tris: {csv_row.get('MaxTris', 'N/A')}")
-                else:
-                    col2.label(text="Max Tris: N/A")
-
-
-        compare_triangle_count(self, context)
-        
-        # Show triangle count status for active object
         obj = context.active_object
         if obj is not None and context.selected_objects:
-            result = is_triangle_count_within_budget(obj)
-            if result is True:
-                layout.label(text="Triangle Count: OK", icon='CHECKMARK')
-            elif result is False:
-                layout.label(text="Triangle Count: Over Budget", icon='ERROR')
+            # Use parent name if available
+            root = obj
+            while root.parent:
+                root = root.parent
+            asset_name = strip_prefix(root.name)
+            csv_row = CSV2MESH_OT_SetCSVData.get_csv_row_for_asset(asset_name)
+            box = layout.box()
+            row = box.row()
+            col1 = row.column(align=True)
+            col2 = row.column(align=True)
+            col1.label(text=f"Active Object: {obj.name}", icon='OBJECT_DATA')
+            if obj.type == 'MESH':
+                col1.label(text=f"Actual Tris: {len(obj.data.polygons)}")
             else:
-                layout.label(text="Triangle Count: N/A", icon='QUESTION')
-        else:
+                col1.label(text="Actual Tris: N/A, not a mesh object")
+            col2.label(text="CSV Data", icon='FILE_TEXT')
+            if csv_row:
+                col2.label(text=f"Max Tris: {csv_row.get('MaxTris', 'N/A')}")
+            else:
+                col2.label(text="Max Tris: N/A")
+        else: 
             layout.label(text="No active object selected.", icon='ERROR')
+            # Show triangle count status for active object
+            obj = context.active_object
+            if obj is not None and context.selected_objects:
+                result = is_triangle_count_within_budget(obj)
+                if result is True:
+                    layout.label(text="Triangle Count: OK", icon='CHECKMARK')
+                elif result is False:
+                    layout.label(text="Triangle Count: Over Budget", icon='ERROR')
+                else:
+                    layout.label(text="Triangle Count: N/A", icon='QUESTION')
+
+            
+        
+
+
+        
                 
         
 
@@ -598,19 +604,25 @@ class CSV2MESH_UL_Prefixes(bpy.types.UIList):
             layout.alignment = 'CENTER'
             layout.label(text=item.prefix)
 
-        def populate_prefixes():
-            scene = bpy.context.scene
+class CSV2MESH_OT_PopulatePrefixes(bpy.types.Operator):
+    bl_idname = "csv2mesh.populate_prefixes"
+    bl_label = "Populate Default Prefixes"
+    bl_description = "Populate the prefix list with default prefixes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+            scene = context.scene
             scene.csv2mesh_prefixes.clear()
             for label, prefix in [
                 ("StaticMesh", "SM"),
-                ("SkeletalMesh", "SK"),
+                ("SkeletalMesh", "PP"),
                 ("MasterMaterial", "MM"),
             ]:
                 item = scene.csv2mesh_prefixes.add()
                 item.label = label
                 item.prefix = prefix
-
-        populate_prefixes()
+            return {'FINISHED'}
+    
 
 class CSV2MESH_OT_AddPrefix(bpy.types.Operator):
     bl_idname = "csv2mesh.add_prefix"
@@ -650,15 +662,23 @@ class CSV2MESH_OT_ResetNameToOriginal(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        obj = context.active_object
-        if obj and "original_name" in obj:
-            original_name = obj["original_name"]
-            obj.name = original_name
-            show_message(f"Reset name of {obj.name} to original name: {original_name}", title="Name Reset", icon='INFO')
-            return {'FINISHED'}
-        else:
-            show_message("No original name found for the active object.", title="No Original Name", icon='ERROR')
-            return {'CANCELLED'}
+        def revert_names(obj):
+        # Revert this object if it has an original_name
+            if "original_name" in obj:
+                original_name = obj["original_name"]
+                obj.name = original_name
+                show_message(f"Reset name of {obj.name} to original name: {original_name}", title="Name Reset", icon='INFO')
+            # Recurse for children
+            for child in obj.children:
+                revert_names(child)
+
+        for obj in context.selected_objects:
+            # Get the root object (topmost parent)
+            root = obj
+            while root.parent:
+                root = root.parent
+            revert_names(root)
+        return {'FINISHED'}
         
 class CSV2MESH_OT_ShowAssetNamesInViewport(bpy.types.Operator):
     bl_idname = "csv2mesh.show_asset_names_in_viewport"
@@ -718,10 +738,12 @@ classes = (
     CSV2MESH_OT_ResetNameToOriginal,
     CSV2MESH_OT_ShowAssetNamesInViewport,
     CSV2MESH_OT_ShowAllAssetNamesInViewport,
-    
+    CSV2MESH_OT_PopulatePrefixes,
 
     
 )
+
+
 
 
 
@@ -773,7 +795,19 @@ def register():
 
 def unregister():
     for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
+        try:
+            bpy.utils.unregister_class(cls)
+        except Exception:
+            pass
+    
+    del bpy.types.Scene.csv_path
+    del bpy.types.Scene.show_custom_props
+    del bpy.types.Scene.csv2mesh_dont_ask_again
+    del bpy.types.Scene.csv2mesh_json_export_path
+    del bpy.types.Scene.csv2mesh_prefixes
+    del bpy.types.Scene.csv2mesh_prefix_index
+    del bpy.types.Scene.csv2mesh_toggle_show_asset_names
+    
 
 # if __name__ == "__main__":
 #     register()

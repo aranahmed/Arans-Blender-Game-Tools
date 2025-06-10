@@ -17,229 +17,102 @@ bl_info = {
     "category": "Game Development",
 }
 
-from .id_generator import (
-    OBJECT_OT_loose_parts_to_vertex_colors, 
-    VIEW3D_PT_ID_Map_Baker, 
-    OBJECT_OT_bake_vertex_colors_to_image, 
-    OBJECT_OT_detect_overlapping_uvs, properties
-)
+# from . id_generator import (
+#     OBJECT_OT_loose_parts_to_vertex_colors, 
+#     VIEW3D_PT_ID_Map_Baker, 
+#     OBJECT_OT_bake_vertex_colors_to_image, 
+#     OBJECT_OT_detect_overlapping_uvs, properties
+# )
 
 
-from .renaming_export import (
-    UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix, properties
-)
+# from .renaming_export import (
+#     UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix, properties
+# )
+
+from . import renaming_export
+
+# from . import lightmap_generator
+from . import id_generator
 
 from . import csv_to_mesh_validator 
 
-modules = [csv_to_mesh_validator. renaming_export, id_generator]
+
+modules = [
+                renaming_export,
+                id_generator,
+                csv_to_mesh_validator,
+            #     lightmap_generator,
+                  ]
 
 
 # from .LOD_generation_tool import (
 
 
-
-# class SuffixForLODAssets(bpy.types.Panel):
-#     bl_label = "Renamer For UE LODs"
-#     bl_idname = "VIEW3D_PT_suffix_for_ue_lods"
-#     bl_space_type = 'VIEW_3D'
-#     bl_region_type = 'UI'
-#     bl_category = 'Game Tools'
-
-    
-#     def execute(self, context):
-#         """
-#         This function is called when the button is clicked.
-#         It sets the suffix for UE LODs.
-#         """
-#         lod_count = context.scene.ue_lod_count
-#         # Check if the lod_count is valid
-#         if lod_count < 0:
-#             self.report({'ERROR'}, "Invalid LOD count")
-#             return {'CANCELLED'}
-        
-#         for i in range(lod_count):
-#             # Set the suffix for each LOD
-#             context.scene.suffix_for_ue_lods = f"LOD{i}"
-#             for obj in context.selected_objects:
-#                 if obj.type == 'MESH':
-#                     # Set the suffix for the object
-#                     obj.name = f"{obj.name}_{context.scene.suffix_for_ue_lods}"
-#                     """""
-#                     # Export the object with the new name
-#                     bpy.ops.export_scene.fbx(filepath=f"{context.scene.ue_export_path}/{obj.name}.fbx", use_selection=True)
-#                     """
-#         self.report({'INFO'}, f"Suffix set to {context.scene.suffix_for_ue_lods} for LODs")
-#         return {'FINISHED'}
- 
-
-#     """
-#     If You Click this button, it should set the Suffix as UCX for UE LODs
-#     """
-
-#     def draw(self, context):
-#         layout = self.layout
-#         scene = context.scene
-
-#         # Export path property
-#         layout.prop(scene, "suffix_for_ue_lods")
-        
-       
-        
-#         # # Export button
-#         # layout.operator("export_scene.ue_export", icon='EXPORT')
-
-
-    
-class VIEW3D_PT_CreateLightMapUVs(bpy.types.Panel):
-        
-    """
-    This operator will create lightmap UVs for the selected objects
-
-    Only do on static meshes, not on VFX meshes
-    
-    generate One image texture
-
-    Two UVs
-
-    UV Map 1 : Normal UVs
-    UV Map 2 : Lightmap UVs
-
-    """
-    bl_label = "Unreal Export"
-    bl_idname = "VIEW3D_PT_create_lightmap_uvs"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'Game Tools'
-    bl_label = "Create Lightmap UVs"
-    
-
-    
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene   
-
-        # Export path property
-        layout.prop(scene, "create_lightmap_uvs")
-        
-        # Export button
-        layout.operator("object.create_lightmap_uvs")
-
-class OBJECT_OT_CreateLightmapUVs(bpy.types.Operator):
-
-    """Create Lightmap UVs for the selected objects"""
-    bl_idname = "object.create_lightmap_uvs"
-    bl_label = "Create Lightmap UVs"
-    bl_options = {'REGISTER', 'UNDO'}
-    bl_description = "Create lightmap UVs for the selected objects"
-
-    def execute(self, context):
-        """
-        This function is called when the button is clicked.
-        It creates lightmap UVs for the selected objects.
-        """
-        # Check if the selected object is a mesh
-        for obj in context.selected_objects:
-            if obj.type == 'MESH':
-                
-                # Create new lightmap UV channel
-                if "lightmap_uv_channel" not in obj.data.uv_layers:
-                    obj.data.uv_layers.new(name="lightmap_uv_channel", do_init=True)
-                else:
-                    self.report({'INFO'}, f"Lightmap UVs already exist for :{obj.name}")
-    
-
-                # Set the active UV map to the lightmap UV channel
-                obj.data.uv_layers.active = obj.data.uv_layers["lightmap_uv_channel"]
-                bpy.context.object.data.uv_layers["lightmap_uv_channel"].active_render = True
-
-                # Unwrap the mesh using the lightmap UV channel
-                bpy.context.view_layer.objects.active = obj
-                bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.select_all(action='SELECT')
-
-                # Unwrap the mesh using the lightmap UV channel if the checkbox is checked
-                if context.scene.create_lightmap_uvs:
-                    bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.001)
-
-
-                bpy.ops.object.mode_set(mode='OBJECT')
-                
-                self.report({'INFO'}, f"Lightmap UVs created for {obj.name}")
-            else:
-                self.report({'ERROR'}, f"{obj.name} is not a mesh")
-                return {'CANCELLED'}
-        return {'FINISHED'}
-
 def properties():
 
-    bpy.types.Scene.create_vertex_groups_from_loose_parts = bpy.props.BoolProperty(
-    name="Create Vertex Groups from Loose Parts",
-    description="Create vertex groups from loose parts",
-    default=False
-    )
+    # bpy.types.Scene.create_vertex_groups_from_loose_parts = bpy.props.BoolProperty(
+    # name="Create Vertex Groups from Loose Parts",
+    # description="Create vertex groups from loose parts",
+    # default=False
+    # )
 
-    bpy.types.Scene.export_baked_ID = StringProperty(
-        name="Export Baked ID Location",
-        description="Export Baked ID",
-        default= "//",
-        subtype='DIR_PATH'
-    )
+    # bpy.types.Scene.export_baked_ID = StringProperty(
+    #     name="Export Baked ID Location",
+    #     description="Export Baked ID",
+    #     default= "//",
+    #     subtype='DIR_PATH'
+    # )
         
-    bpy.types.Scene.prefix_for_ue = StringProperty(
-    name="PREFIX FOR UNREAL Static Mesh",
-    description="PrefixSet for UE Assets",
-    default= "SM",
+    # bpy.types.Scene.prefix_for_ue = StringProperty(
+    # name="PREFIX FOR UNREAL Static Mesh",
+    # description="PrefixSet for UE Assets",
+    # default= "SM",
         
-    )
+    # )
     
-    bpy.types.Scene.prefix_for_ue = StringProperty(
-        name="PREFIX FOR UNREAL VFX Mesh",
-        description="PrefixSet for UE Assets that are VFX meshes",
-        default= "SM",
-        subtype='DIR_PATH'
-    )
+    # bpy.types.Scene.prefix_for_ue = StringProperty(
+    #     name="PREFIX FOR UNREAL VFX Mesh",
+    #     description="PrefixSet for UE Assets that are VFX meshes",
+    #     default= "SM",
+    #     subtype='DIR_PATH'
+    # )
 
-    bpy.types.Scene.suffix_for_ue_lods = IntProperty(
-        name="Number of LODs",
-        description="Suffix for LODs", 
-        default=0,
-        min=0,
-        max=6,
-    )
+    # bpy.types.Scene.suffix_for_ue_lods = IntProperty(
+    #     name="Number of LODs",
+    #     description="Suffix for LODs", 
+    #     default=0,
+    #     min=0,
+    #     max=6,
+    # )
 
-    bpy.types.Scene.ue_vfx_toggle = BoolProperty(
-        name="VFX MESH",
-        description="Ïs it a VFX mesh?",
-        default=False, 
-    )   
+    # bpy.types.Scene.ue_vfx_toggle = BoolProperty(
+    #     name="VFX MESH",
+    #     description="Ïs it a VFX mesh?",
+    #     default=False, 
+    # )   
 
-    bpy.types.Scene.ue_export_path = StringProperty(
-        name="Export Path",
-        description="Directory to export Unreal assets to",
-        default="//", 
-        subtype='DIR_PATH'
-    )
+    # bpy.types.Scene.ue_export_path = StringProperty(
+    #     name="Export Path",
+    #     description="Directory to export Unreal assets to",
+    #     default="//", 
+    #     subtype='DIR_PATH'
+    # )
 
-    bpy.types.Scene.ue_export_multiple = BoolProperty(
-        name="Export Multiple",
-        description="Toggle to export multiple objects or a single object",
-        default=False
-    )
-
-
-    bpy.types.Scene.create_lightmap_uvs = BoolProperty(
-        name="AutoUnwrap Lightmap UVs",
-        description="Create lightmap UVs for the selected objects",
-        default=False
-    )
+    # bpy.types.Scene.ue_export_multiple = BoolProperty(
+    #     name="Export Multiple",
+    #     description="Toggle to export multiple objects or a single object",
+    #     default=False
+    # )
+    pass
 
         
-classes = [ UEExportPanel, PrefixForUE, OBJECT_OT_SetPrefix,
-            VIEW3D_PT_CreateLightMapUVs, OBJECT_OT_CreateLightmapUVs,
-            OBJECT_OT_loose_parts_to_vertex_colors, 
-            VIEW3D_PT_ID_Map_Baker,
-            OBJECT_OT_bake_vertex_colors_to_image,
-            OBJECT_OT_detect_overlapping_uvs]
+classes = [ 
+            
+            # OBJECT_OT_loose_parts_to_vertex_colors, 
+            # VIEW3D_PT_ID_Map_Baker,
+            # OBJECT_OT_bake_vertex_colors_to_image,
+            # OBJECT_OT_detect_overlapping_uvs
+            ]
 
 def register():
     # Register the classes

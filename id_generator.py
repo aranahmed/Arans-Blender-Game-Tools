@@ -158,16 +158,16 @@ class OBJECT_OT_loose_parts_to_vertex_colors(bpy.types.Operator):
             #self.check_for_overlapping_uvs(context, used_colors)
 
 
-        self.report({'INFO'}, f"Assigned vertex colors to {len(parts)} loose parts.")
+        self.report({'INFO'}, f"Assigned vertex colours to {len(parts)} loose parts.")
         return {'FINISHED'}
 
 class VIEW3D_PT_ID_Map_Baker(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
-    bl_label = "ID Map Baker"
+    bl_label = "Vert Colour Tools"
     bl_idname = "VIEW3D_PT_id_map_baker"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'Game Tools'
+    bl_category = 'CSV2Mesh'
 
     def draw(self, context):
         layout = self.layout
@@ -184,6 +184,23 @@ class VIEW3D_PT_ID_Map_Baker(bpy.types.Panel):
 
 
         layout.operator("object.detect_overlapping_uvs", icon='NONE')
+
+        layout.separator()
+        layout.label(text="Bake BBOX Vert Colours:")
+
+        grid = layout.grid_flow(row_major=True, columns=3, even_columns=True, even_rows=True, align=True)
+        grid.prop(scene, "gradient_r_axis", text="Red Axis")
+        grid.prop(scene, "gradient_g_axis", text="Green Axis")
+        grid.prop(scene, "gradient_b_axis", text="Blue Axis")
+
+        row = layout.row()
+        row.prop(scene,"reverse_bbox_gradient_toggle", text="Reverse")
+        row.operator("object.bake_bbox_gradient_to_vertex_colors", icon='NONE')
+
+        layout.separator()
+        layout.label(text="Bake Origin Radial Vert Colours:")
+        layout.operator("object.bake_origin_radial_gradient_to_vertex_colours", icon='NONE')
+
 
 
         
@@ -317,6 +334,113 @@ class OBJECT_OT_detect_overlapping_uvs(bpy.types.Operator):
         print(f"Assigned {len(overlapped_verts)} vertices to 'OverlappedUVs' group.")
 
         return {'FINISHED'}
+    
+class OBJECT_OT_bake_bbox_gradient_to_vertex_colors(bpy.types.Operator):
+    #Bake a BBOX-based gradient to vertex colors
+    bl_idname = "object.bake_bbox_gradient_to_vertex_colors"
+    bl_label = "Bake BBOX Gradient to Vertex Colors"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'ERROR'}, "Select a mesh object")
+            return {'CANCELLED'}
+
+        mesh = obj.data
+
+        # Ensure a vertex color layer exists
+        if not mesh.vertex_colors:
+            vcol = mesh.vertex_colors.new(name="BBOX_Gradient")
+        else:
+            vcol = mesh.vertex_colors.active
+
+        # Get all vertex coordinates in object space
+        coords = [v.co for v in mesh.vertices]
+        min_x = min(v.x for v in coords)
+        max_x = max(v.x for v in coords)
+        min_y = min(v.y for v in coords)
+        max_y = max(v.y for v in coords)
+        min_z = min(v.z for v in coords)
+        max_z = max(v.z for v in coords)
+
+        # Avoid division by zero
+        range_x = max_x - min_x if max_x != min_x else 1.0
+        range_y = max_y - min_y if max_y != min_y else 1.0
+        range_z = max_z - min_z if max_z != min_z else 1.0
+
+        scene = context.scene
+        axis_map = {
+            'X' : lambda v: (v.x - min_x) / range_x,
+            'Y' : lambda v: (v.y - min_y) / range_y,
+            'Z' : lambda v: (v.z - min_z) / range_z,
+
+        }
+
+        r_axis = scene.gradient_r_axis
+        g_axis = scene.gradient_g_axis
+        b_axis = scene.gradient_b_axis
+
+
+        # Assign gradient color to each loop (per face corner)
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vert_idx = mesh.loops[loop_idx].vertex_index
+                v = mesh.vertices[vert_idx].co
+                # Normalize to 0..1
+                r = axis_map[r_axis](v)
+                g = axis_map[g_axis](v)
+                b = axis_map[b_axis](v)
+                if scene.reverse_bbox_gradient_toggle:
+
+                    # Reverse the gradient
+                    r = 1.0 - r
+                    g = 1.0 - g
+                    b = 1.0 - b
+                
+                # Example: RGB = XYZ gradient
+                vcol.data[loop_idx].color = (r, g, b, 1.0)
+
+        self.report({'INFO'}, "BBOX gradient vertex colors assigned.")
+        return {'FINISHED'}
+    
+class OBJECT_OT_bake_origin_radial_gradient_to_vertex_colors(bpy.types.Operator):
+    # Bake a radial gradient from the object's origin to its edge
+    bl_idname = "object.bake_origin_radial_gradient_to_vertex_colours"
+    bl_label = "Bake Origin Radial Gradient"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'ERROR'}, "Select a mesh object")
+            return {'CANCELLED'}
+
+        mesh = obj.data
+
+        # Ensure a vertex color layer exists
+        if not mesh.vertex_colors:
+            vcol = mesh.vertex_colors.new(name="OriginRadialGradient")
+        else:
+            vcol = mesh.vertex_colors.active
+
+        # Compute distances from origin for all vertices
+        coords = [v.co for v in mesh.vertices]
+        distances = [v.length for v in coords]
+        max_dist = max(distances) if distances else 1.0
+
+        # Assign gradient color to each loop (per face corner)
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vert_idx = mesh.loops[loop_idx].vertex_index
+                v = mesh.vertices[vert_idx].co
+                d = v.length / max_dist if max_dist != 0 else 0.0
+                # Grayscale: all channels get the same value
+                
+                vcol.data[loop_idx].color = (d, d, d, 1.0)
+
+        self.report({'INFO'}, "Radial gradient from origin assigned to vertex colors.")
+        return {'FINISHED'}
 
 def properties():
     
@@ -324,12 +448,39 @@ def properties():
         name="Create Vertex Groups from Loose Parts",
         description="Create vertex groups from loose parts",
         default=False
+    )
+    bpy.types.Scene.reverse_bbox_gradient_toggle = bpy.props.BoolProperty(
+      
+        name="Toggle Reverse BBOX Gradient",
+        description="Toggle the reverse BBOX gradient",
+        default=False
     )   
+    bpy.types.Scene.gradient_r_axis = bpy.props.EnumProperty(
+        name="Red Axis",
+        description="Axis for Red channel",
+        items=[('X', "X", ""), ('Y', "Y", ""), ('Z', "Z", "")],
+        default='Z'
+    )
+    bpy.types.Scene.gradient_g_axis = bpy.props.EnumProperty(
+        name="Green Axis",
+        description="Axis for Green channel",
+        items=[('X', "X", ""), ('Y', "Y", ""), ('Z', "Z", "")],
+        default='Z'
+    )
+    bpy.types.Scene.gradient_b_axis = bpy.props.EnumProperty(
+        name="Blue Axis",
+        description="Axis for Blue channel",
+        items=[('X', "X", ""), ('Y', "Y", ""), ('Z', "Z", "")],
+        default='Z'
+    )
+    
 def register():
     bpy.utils.register_class(OBJECT_OT_loose_parts_to_vertex_colors)
     bpy.utils.register_class(VIEW3D_PT_ID_Map_Baker)
     bpy.utils.register_class(OBJECT_OT_bake_vertex_colors_to_image)
     bpy.utils.register_class(OBJECT_OT_detect_overlapping_uvs)
+    bpy.utils.register_class(OBJECT_OT_bake_bbox_gradient_to_vertex_colors)
+    bpy.utils.register_class(OBJECT_OT_bake_origin_radial_gradient_to_vertex_colors)
 
     properties()
 
@@ -338,6 +489,15 @@ def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_ID_Map_Baker)
     bpy.utils.unregister_class(OBJECT_OT_bake_vertex_colors_to_image)
     bpy.utils.unregister_class(OBJECT_OT_detect_overlapping_uvs)
+    bpy.utils.unregister_class(OBJECT_OT_bake_bbox_gradient_to_vertex_colors)
+    bpy.utils.unregister_class(OBJECT_OT_bake_origin_radial_gradient_to_vertex_colors)
+
+    del bpy.types.Scene.create_vertex_groups_from_loose_parts
+    del bpy.types.Scene.gradient_r_axis
+    del bpy.types.Scene.gradient_g_axis
+    del bpy.types.Scene.gradient_b_axis
+    del bpy.types.Scene.reverse_bbox_gradient_toggle
+
 
 if __name__ == "__main__":
     register()

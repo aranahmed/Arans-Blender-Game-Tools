@@ -2,7 +2,7 @@ import bpy
 from bpy.props import StringProperty, BoolProperty, IntProperty
 from bpy.types import Operator, Panel
 import os
-
+from mathutils import Vector
 import pprint as pprint
 
 # import pathlib
@@ -11,12 +11,11 @@ import pprint as pprint
 #print(f"Path to JSON: {path_to_json}")
 
 
-obj = bpy.context.active_object
+
 
 
 #import csv
 import json
-
 
 
 # --- CONFIGURATION ---
@@ -28,74 +27,32 @@ def show_message(message="", title="Error", icon='ERROR'):
         self.layout.label(text=message)
     bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
+def batch_import_fbx(directory, apply_transform=False):
+    """Batch import FBX files from a directory into Blender."""
+    if not os.path.isdir(directory):
+        show_message(f"Directory does not exist: {directory}", title="Import Error", icon='ERROR')
+        return
 
+    # Get all FBX files in the directory
+    fbx_files = [f for f in os.listdir(directory) if f.lower().endswith('.fbx')]
+    if not fbx_files:
+        show_message("No FBX files found in the directory.", title="Import Error", icon='ERROR')
+        return
 
-# not using atm
-""" # Function to find asset name in CSV and compare with selected object
-def FindAssetName():
-    # --- READ CSV ---
-    material_map = {}
-    with open(csv_path, newline='') as csvfile:
-        reader = csv.reader(csvfile)
-        headers = next(reader)  # Read header row
-        for row in reader:
-            row_data = {header.strip(): value.strip() for header, value in zip(headers, row)}
-            print(f"Row data: {row_data}")
+    for fbx_file in fbx_files:
+        file_path = os.path.join(directory, fbx_file)
+        bpy.ops.import_scene.fbx(filepath=file_path, use_custom_props=True)
 
-            if 'AssetName' in row_data:
-                asset_name = row_data['AssetName']
-                # Compare with selected object name
-                if obj.name != asset_name:
-                    print(f"Error: Selected object name '{obj.name}' does not match asset name '{asset_name}' from CSV.")
-                else:
-                    if "original_name" not in obj:
-                        
-                        # Store the original name in a custom property
-                        obj["original_name"] = obj.name
-                    # Store the asset name in a custom property
-                    obj["AssetName"] = asset_name
-                    print(f"Asset name '{asset_name}' matches the selected object.")
-
-                    # Parse the asset type from the row_data if present
-                    asset_type = row_data.get('Category', None)
-                    new_name = obj.name  # Default to current name
-                    if asset_type:
-                        obj["AssetType"] = asset_type
-                        print(f"Asset type '{asset_type}' found and stored.")
-                        if asset_type == "Environment" or "Prop":
-                            #obj.name = obj["original_name"]  # Reset to original name
-                            obj["AssetType"] = "StaticMesh"
-                            new_name = f"SM_{asset_name}"
-                        elif asset_type == "Character": 
-                            #obj.name = obj["original_name"]  # Reset to original name
-                            obj["AssetType"] = "SkeletalMesh"
-                            new_name = f"SK_{asset_name}"
-                    else:
-                        print("Asset type not found in CSV row.")
-                        obj.name = new_name
-
-                    return True, asset_name, asset_type
-
-            # Example: store in material_map if those columns exist
-            if 'obj_name' in row_data and 'mat_name' in row_data:
-                material_map[row_data['obj_name']] = row_data['mat_name']
-"""
-
-# not using atm
-""" # Function to check asset type based on the asset name
-def CheckAssetType(asset_name):
-    
-    pass
-"""
-
-def show_message(message="", title="Error", icon='ERROR'):
-    def draw(self, context):
-        self.layout.label(text=message)
-    bpy.context.window_manager.popup_menu(draw, title=title, icon=icon)
 
 def export_fbx(obj, export_path, apply_transform=True):
+    # Store original location 
+    original_location = obj.location.copy()
+    # Move the object to the origin before export
+    obj.location = Vector((0.0, 0.0, 0.0))
+
     # Ensure the export directory exists
     os.makedirs(os.path.dirname(export_path), exist_ok=True)
+
     # Deselect all, select only the object to export
     bpy.ops.object.select_all(action='DESELECT')
     obj.select_set(True)
@@ -116,17 +73,29 @@ def export_fbx(obj, export_path, apply_transform=True):
         use_custom_props=True
     )
 
+    # Restore original location
+    obj.location = original_location
+
+
+
 
 class UEExportPanel_PT_Export(bpy.types.Panel):
     bl_label = "Unreal Export"
     bl_idname = "VIEW3D_PT_unreal_export"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'Game Tools'
+    bl_category = 'CSV2Mesh'
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+
+        layout.label(text="FBX Import", icon='IMPORT')
+        layout.prop(scene, "fbx_import_path", text="FBX Path", icon='FILE_FOLDER')
+        row = layout.row()
+        row.operator("ueexportpanel.import_fbx", icon='IMPORT', text="Import FBX Files")
+        row.operator("ueexportpanel.offset_fbx", text="Offset Imported FBX")
+
 
         # Export path property
         layout.prop(scene, "ue_export_path", text="Export Path", icon='FILE_FOLDER')
@@ -149,7 +118,21 @@ class UEExportPanel_PT_Export(bpy.types.Panel):
             layout.prop(scene, "export_custom_props", text="Export JSON Path")
             layout.operator("ueexportpanel.export_custom_props", icon='EXPORT')
 
+class UEExportPanel_OT_ImportFBX(bpy.types.Operator):
+    bl_idname = "ueexportpanel.import_fbx"
+    bl_label = "Import FBX Files"
+    bl_description = "Import multiple FBX files from the specified path"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        fbx_path = bpy.path.abspath(scene.fbx_import_path)
+        if not os.path.isdir(fbx_path):
+            self.report({'ERROR'}, "FBX import path does not exist.")
+            return {'CANCELLED'}
         
+        batch_import_fbx(fbx_path, apply_transform=True)
+        return {'FINISHED'}       
 
 class UEExportPanel_OT_Export(bpy.types.Operator):
     bl_idname = "export_scene.ue_export"
@@ -193,66 +176,8 @@ class UEExportPanel_OT_Export(bpy.types.Operator):
             write_custom_properties_to_json(obj, scene.export_custom_props)
             return {'FINISHED'}
 
-        # If exporting multiple objects, use the first selected object's name
-        #export_fbx(obj, fbx_path, apply_transform=True)
-
-
-
-        
-        # vfx_toggle = scene.ue_vfx_toggle
-        # export_multiple = scene.ue_export_multiple
-        # #prefix_for_ue = scene.prefix_for_ue
-        # export_custom_props = scene.ue_export_with_custom_props
-        # if not export_path:
-        #     self.report({'ERROR'}, "Export path is not set.")
-        #     return {'CANCELLED'}
-        # if export_custom_props:
-        #     custom_props_path = bpy.path.abspath(export_path)
-        #     if export_multiple:
-        #         #self.report({'ERROR'}, "Custom properties export is not supported for multiple objects.")
-        #         for obj in context.selected_objects:
-        #             write_custom_properties_to_json(obj, custom_props_path)
-        #             print(f"Custom properties for {obj.name} exported to {custom_props_path}")
-        #             export_fbx(obj, fbx_path, apply_transform=True)
-        #     else:
-        #         write_custom_properties_to_json(context.active_object, scene.export_custom_props)
-        #         export_fbx(context.active_object, fbx_path, apply_transform=True)
-                
-
-        #     if not custom_props_path:
-        #         self.report({'ERROR'}, "Custom properties export path is not set.")
-        #         return {'CANCELLED'}
-        # if not context.selected_objects:
-        #     self.report({'ERROR'}, "No objects selected for export.")
-        #     return {'CANCELLED'}
-        
-      
-
         
         return {'FINISHED'}
-
-
-
-class UEExport_PT_PrefixNameChanger(bpy.types.Panel):
-    """Creates a Panel in the Object properties window"""
-    bl_label = "Prefix Name Changer"
-    bl_idname = "VIEW3D_PT_prefix_for_ue"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = 'Game Tools'
-
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-
-        # Adds a text box for the prefix
-        layout.prop(scene, "prefix_for_ue")
-       
-
-        # Add the button to execute the operator
-        layout.operator("object.set_prefix_ue", icon='NONE')
-
-# Register the operator classes
 
 def write_custom_properties_to_json(obj, filepath):
     
@@ -296,24 +221,60 @@ def write_custom_properties_to_json(obj, filepath):
     if not updated:
         data.append(unreal_obj)
 
- 
+class UEExportPanel_OT_OffsetFBX(bpy.types.Operator):
+    bl_idname = "ueexportpanel.offset_fbx"
+    bl_label = "Offset Imported FBX"
+    bl_description = "Offset the imported FBX files by 100 units in the X direction"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+         # Collect root objects (armatures or meshes) for selected meshes
+        roots = []
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                root = obj
+                while root.parent:
+                    root = root.parent
+                if root not in roots:
+                    roots.append(root)
+
+        # Sort roots by name for consistent order
+        roots.sort(key=lambda o: o.name)
+
+        current_x = 0.0
+        for root in roots:
+            # Calculate the bounding box in world space for the root and all its children
+            all_objs = [root] + list(root.children_recursive)
+            all_meshes = [o for o in all_objs if o.type == 'MESH']
+            if not all_meshes:
+                continue
+
+            # Get all world-space bounding box corners
+            all_bbox_points = []
+            for mesh_obj in all_meshes:
+                all_bbox_points.extend([mesh_obj.matrix_world @ Vector(corner) for corner in mesh_obj.bound_box])
+
+            min_x = min(v.x for v in all_bbox_points)
+            max_x = max(v.x for v in all_bbox_points)
+            length_x = max_x - min_x
+
+            # Move root so its min_x aligns with current_x
+            offset = current_x - min_x
+            root.location.x += offset
+
+            self.report({'INFO'}, f"Placed {root.name} at X={current_x:.2f} (length {length_x:.2f})")
+            current_x += length_x  # Next object's position
+
+        return {'FINISHED'}
     
-    
-    # Write to JSON file
-    if not custom_props:
-        show_message("No custom properties found to export.", title="No Custom Properties", icon='ERROR')
-    with open(abs_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
-    #   bpy.context.window_manager.popup_menu(f"Custom properties written to {filepath}.", title="Custom Properties Exported", icon='INFO')
-    
+
+     
 class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
     bl_idname = "ueexportpanel.export_custom_props"
     bl_label = "Export Custom Properties"
     bl_description = "Export custom properties of selected objects to a JSON file"
     bl_options = {'REGISTER', 'UNDO'}
     
-
-
     def execute(self, context):
         filepath = bpy.path.abspath(context.scene.export_custom_props)
         if not filepath:
@@ -326,7 +287,9 @@ class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
 classes = [
     UEExportPanel_PT_Export,
     UEExportPanel_OT_ExportCustomProps, 
-    UEExportPanel_OT_Export
+    UEExportPanel_OT_Export,
+    UEExportPanel_OT_ImportFBX,
+    UEExportPanel_OT_OffsetFBX
 
 ]
 
@@ -372,7 +335,18 @@ properties = {
         name="Export Mesh",
         description="Button to export the mesh",
         default="Export Mesh",
-    )
+    ),
+    "fbx_import_path": StringProperty(
+        name="FBX Import Path",
+        description="Path to import FBX files from",
+        default="//",
+        subtype='DIR_PATH'
+    ),
+    # "multi_fbx_import": BoolProperty(
+    #     name="Import FBX Files",
+    #     description="Toggle to import multiple FBX files from the specified path",
+    #     default=False
+    # )
 }
 
 def register(): 
@@ -386,13 +360,10 @@ def register():
    
 
 def unregister():
-    for prop_name, prop in properties.items():
-        delattr(bpy.types.Scene, prop_name, prop)
+    for prop_name in properties.keys():
+        delattr(bpy.types.Scene, prop_name)
     
     for cls in classes:
         bpy.utils.unregister_class(cls)
 
      
-
-if __name__ == "__main__":
-    register()
