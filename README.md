@@ -3,6 +3,13 @@
 **Aran's Game Tools** is a Blender add-on designed to streamline the asset pipeline between Blender and Unreal Engine, with a strong focus on **CSV-driven asset management** and seamless Unreal Python integration. This toolkit is ideal for game developers and technical artists who want to automate repetitive tasks, enforce naming/material conventions, and ensure their assets are always Unreal-ready.
 
 ---
+## Install
+
+[![Watch the video](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)]([https://youtu.be/josrG0BzsxI])
+
+## Overview Video 0.0.2
+
+[![Watch the video](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)]([https://youtu.be/WJ-lLqbd884&t=2s])
 
 ## 🚀 Key Features
 
