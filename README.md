@@ -5,11 +5,11 @@
 ---
 ## Install
 
-[![Watch the video](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)]([https://youtu.be/josrG0BzsxI])
+[![Watch the video](https://img.youtube.com/vi/josrG0BzsxI/maxresdefault.jpg)]([https://youtu.be/josrG0BzsxI])
 
 ## Overview Video 0.0.2
 
-[![Watch the video](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)]([https://youtu.be/WJ-lLqbd884&t=2s])
+[![Watch the video](https://img.youtube.com/vi/WJ-lLqbd884&t=2s/maxresdefault.jpg)]([https://youtu.be/WJ-lLqbd884&t=2s])
 
 ## 🚀 Key Features
 
