@@ -3,11 +3,11 @@ import bpy
 from bpy.props import StringProperty, BoolProperty, IntProperty, FloatProperty, CollectionProperty, PointerProperty
 import csv
 
-# --- CONFIGURATION ---
+# configs [to remove]
 CSV_PATH = "I:/Blender/MyScripts/GameData.csv"  # Update this path!
-PREFIX_LIST = ['SM_', 'SK_', 'MM_']  # Unreal Engine naming conventions
+PREFIX_LIST = ['SM_', 'SK_', 'MM_']  # unreal naming conventions
 
-# --- UTILITY FUNCTIONS ---
+# utility functions
 
 def is_triangle_count_within_budget(obj):
     if obj.type != 'MESH':
@@ -27,7 +27,7 @@ def strip_prefix(name, prefixes=PREFIX_LIST):
     for prefix in prefixes:
         if name.startswith(prefix):
             return name[len(prefix):]
-    # If no known prefix, strip up to first underscore
+    # If it cant find prefix, strip up to first underscore
     if "_" in name:
         return name.split("_", 1)[1]
     return name
@@ -43,7 +43,7 @@ def take_away_underscore(name):
     return name
 
 
-# Debug method
+# debug method
 def show_message(message="", title="Error", icon='ERROR'):
     def draw(self, context):
         self.layout.label(text=message)
@@ -57,14 +57,8 @@ def clear_custom_properties(obj):
         del obj[k]
     show_message(f"Cleared custom properties for {obj.name}.", title="Custom Properties Cleared", icon='INFO')
 
-# def print_custom_properties(obj):
-#     msg = f"Custom properties for {obj.name}:\n"
-#     for k in obj.keys():
-#         if not k.startswith("_"):
-#             msg += f"  {k}: {obj[k]}\n"
-#     show_message(msg, title="Custom Properties", icon='INFO')
 
-# --- CSV DATA ACCESS ---
+#CSV data read/write functions
 
 class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
 
@@ -96,7 +90,7 @@ class CSV2MESH_OT_SetCSVData(bpy.types.Operator):
                     return row
         return None
     
-# --- CSV Data Write Functions ---
+# CSV write to update actual triangles count
 
     # very risky function, use with caution
     
@@ -126,7 +120,7 @@ def update_actual_tris_in_csv(asset_name, actual_tris, csv_path):
     else:
         show_message(f"Asset {asset_name} not found in CSV.", title="CSV Update Failed", icon='ERROR')
 
-# --- MAIN LOGIC FUNCTIONS ---
+# Main functions
 
 def process_asset(obj):
     """Rename and tag the object based on CSV data."""

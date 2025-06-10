@@ -152,7 +152,7 @@ class UEExportPanel_OT_Export(bpy.types.Operator):
         export_name = obj.name
 
 
-        selected_objects = context.selected_objects
+        selected_objects = [obj for obj in context.selected_objects if obj.parent is None]
         if not selected_objects:
             self.report({'ERROR'}, "No objects selected for export.")
             return {'CANCELLED'}
@@ -166,14 +166,22 @@ class UEExportPanel_OT_Export(bpy.types.Operator):
                 export_name = obj.name
                 fbx_path = os.path.join(export_path, f"{export_name}.fbx")
                 export_fbx(obj, fbx_path, apply_transform=True)
-                write_custom_properties_to_json(obj, scene.export_custom_props)
-
-                    
+                json_path = scene.export_custom_props if scene.export_custom_props else os.path.join(export_path, "custom_properties.json")
+                parent_objects = [obj for obj in context.selected_objects if obj.parent is None]
+                # for obj in parent_objects:
+                #     write_custom_properties_to_json(obj, json_path)
+                
+                self.report({'INFO'}, f"Exported custom properties to {json_path}")
+            return {'FINISHED'}
+      
         else:
             # If exporting a single object, use the active object's name
             fbx_path = os.path.join(export_path, f"{export_name}.fbx")
             export_fbx(obj, fbx_path, apply_transform=True)
-            write_custom_properties_to_json(obj, scene.export_custom_props)
+            json_path = scene.export_custom_props if scene.export_custom_props else os.path.join(export_path, "custom_properties.json")
+            # parent_object = obj.parent if obj.parent else obj
+            # write_custom_properties_to_json(parent_object, json_path)
+            self.report({'INFO'}, f"Exported custom properties to {json_path}")
             return {'FINISHED'}
 
         
@@ -220,6 +228,24 @@ def write_custom_properties_to_json(obj, filepath):
             break
     if not updated:
         data.append(unreal_obj)
+
+def write_custom_properties_batch(objs, filepath):
+    abs_path = bpy.path.abspath(filepath)
+    if not abs_path.endswith('.json'):
+        abs_path += '.json'
+    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+    # Prepare data for all objects
+    data = []
+    for obj in objs:
+        custom_props = {k: v for k, v in obj.items() if not k.startswith("_")}
+        unreal_obj = {"name": obj.name}
+        unreal_obj.update(custom_props)
+        data.append(unreal_obj)
+
+    # Write all at once
+    with open(abs_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4)
 
 class UEExportPanel_OT_OffsetFBX(bpy.types.Operator):
     bl_idname = "ueexportpanel.offset_fbx"
@@ -277,11 +303,13 @@ class UEExportPanel_OT_ExportCustomProps(bpy.types.Operator):
     
     def execute(self, context):
         filepath = bpy.path.abspath(context.scene.export_custom_props)
-        if not filepath:
-             print("No export path specified for custom properties.")
-
-        for obj in context.selected_objects:
-            write_custom_properties_to_json(obj, filepath)
+        if not filepath or not filepath.endswith('.json'):
+             filepath = bpy.path.abspath("//custom_properties.json")
+             show_message("No export path specified for custom properties.")
+        
+        parent_objects = [obj for obj in context.selected_objects if obj.parent is None]
+        write_custom_properties_batch(parent_objects, filepath)
+        self.report({'INFO'}, f"Exported custom properties to {filepath}")
         return {'FINISHED'}
     
 classes = [
